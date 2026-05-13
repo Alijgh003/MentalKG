@@ -22,62 +22,61 @@ example_entities = dspy.Example(
         {"name": "no anatomical or physiological cause", "type": "concept"},
         {"name": "ineffective", "type": "concept"},
     ],
+    alright=True,
 )
 
 case_study_para1_entities = dspy.Example(
     text=""""Wow! My chart must be 2 inches thick." Julian Fenster is checking in for his third emergency room visit in the past month. "That's just Volume 3," the nurse tells him. At age 24, Julian lives with his mother and a teenage sister. Years ago, he enrolled at a college several hundred miles away. After only a semester, he moved back home. "I didn't want to be that far from my doctors," he explains. "When you're trying to prevent heart disease, you can't be too careful." With a practiced hand, he adjusts the blood pressure cuff around his upper arm.""",
     context_hierarchy="chapter 8 -> somatic symptom and related disorders -> illness anxiety disorder -> case study: julian fenster",
-    result={
-        "passage_type": "case_study_narrative",
-        "entities": [
-            {"name": "Julian Fenster", "type": "patient"},
-            {
-                "name": "third emergency room visit in the past month",
-                "type": "behavior",
-            },
-            {"name": "age 24", "type": "demographic"},
-            {
-                "name": "lives with his mother and a teenage sister",
-                "type": "social_context",
-            },
-            {
-                "name": "enrolled at a college several hundred miles away",
-                "type": "behavior",
-            },
-            {"name": "moved back home", "type": "behavior"},
-            {"name": "prevent heart disease", "type": "concern"},
-            {"name": "adjusts the blood pressure cuff", "type": "behavior"},
-        ],
-    },
+    passage_type="case_study_narrative",
+    alright=True,
+    entities=[
+        {"name": "Julian Fenster", "type": "patient"},
+        {
+            "name": "third emergency room visit in the past month",
+            "type": "behavior",
+        },
+        {"name": "age 24", "type": "demographic"},
+        {
+            "name": "lives with his mother and a teenage sister",
+            "type": "social_context",
+        },
+        {
+            "name": "enrolled at a college several hundred miles away",
+            "type": "behavior",
+        },
+        {"name": "moved back home", "type": "behavior"},
+        {"name": "prevent heart disease", "type": "concern"},
+        {"name": "adjusts the blood pressure cuff", "type": "behavior"},
+    ],
 )
 
 case_study_para2_entities = dspy.Example(
     text="""When Julian was a young teenager, his dad died. "His death was self-inflicted," Julian points out. "He'd had rheumatic fever as a child, which gave him an enlarged heart. And the only thing he ever exercised was his right to eat anything fried, including Twinkies. And he smoked—he was a proud two-pack-a-day man. Look where that got him." None of these health risks apply to Julian, who is nothing if not careful about what he puts into his body. He has spent hours searching the Internet for information on diet, and he once attended a lecture by Dean Ornish. "I've followed a plant-based diet ever since," Julian said. "I'm especially keen on tofu. And broccoli." Julian has never complained much about having symptoms—just the odd palpitation, maybe "hot flushes" on an especially humid day. "I don't feel bad," he explains. "I just feel scared." This time, he's heard a report on NPR about young people with heart disease. It startled him so much he dropped the dish he had been putting into the cupboard. Without even cleaning up the mess, he caught the next bus to the ER.""",
     context_hierarchy="chapter 8 -> somatic symptom and related disorders -> illness anxiety disorder -> case study: julian fenster",
-    result={
-        "passage_type": "case_study_narrative",
-        "entities": [
-            {"name": "Julian Fenster", "type": "patient"},
-            {"name": "dad died", "type": "life_event"},
-            {"name": "self-inflicted", "type": "life_event"},
-            {"name": "rheumatic fever", "type": "medical_history"},
-            {"name": "enlarged heart", "type": "medical_history"},
-            {
-                "name": "searches the Internet for information on diet",
-                "type": "behavior",
-            },
-            {"name": "plant-based diet", "type": "behavior"},
-            {"name": "palpitation", "type": "symptom"},
-            {"name": "hot flushes", "type": "symptom"},
-            {"name": "scared", "type": "emotional_state"},
-            {
-                "name": "report on NPR about young people with heart disease",
-                "type": "trigger",
-            },
-            {"name": "dropped the dish", "type": "reaction"},
-            {"name": "caught the next bus to the ER", "type": "behavior"},
-        ],
-    },
+    alright=True,
+    passage_type="case_study_narrative",
+    entities=[
+        {"name": "Julian Fenster", "type": "patient"},
+        {"name": "dad died", "type": "life_event"},
+        {"name": "self-inflicted", "type": "life_event"},
+        {"name": "rheumatic fever", "type": "medical_history"},
+        {"name": "enlarged heart", "type": "medical_history"},
+        {
+            "name": "searches the Internet for information on diet",
+            "type": "behavior",
+        },
+        {"name": "plant-based diet", "type": "behavior"},
+        {"name": "palpitation", "type": "symptom"},
+        {"name": "hot flushes", "type": "symptom"},
+        {"name": "scared", "type": "emotional_state"},
+        {
+            "name": "report on NPR about young people with heart disease",
+            "type": "trigger",
+        },
+        {"name": "dropped the dish", "type": "reaction"},
+        {"name": "caught the next bus to the ER", "type": "behavior"},
+    ],
 )
 
 case_study_para2_entities = case_study_para2_entities.with_inputs(

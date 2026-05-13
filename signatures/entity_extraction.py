@@ -36,6 +36,9 @@ class DisorderEntityExtractor(dspy.Signature):
         desc="Optional: section title, e.g., 'Fine Print - The D's'"
     )
 
+    alright: bool = dspy.OutputField(
+        desc="it is possible that an input is meaningless, in this case this should be False, o.w. True."
+    )
     entities: list[dict] = dspy.OutputField(
         desc="List of entities with name, type, start_char, end_char"
     )
