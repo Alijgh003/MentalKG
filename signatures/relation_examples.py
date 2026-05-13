@@ -66,7 +66,7 @@ example_relations = dspy.Example(
 
 case_study_para1_relations = dspy.Example(
     text=""""Wow! My chart must be 2 inches thick." Julian Fenster is checking in for his third emergency room visit in the past month. "That's just Volume 3," the nurse tells him. At age 24, Julian lives with his mother and a teenage sister. Years ago, he enrolled at a college several hundred miles away. After only a semester, he moved back home. "I didn't want to be that far from my doctors," he explains. "When you're trying to prevent heart disease, you can't be too careful." With a practiced hand, he adjusts the blood pressure cuff around his upper arm.""",
-    entities=case_study_para1_entities.result["entities"],
+    entities=case_study_para1_entities["entities"],
     passage_type="case_study_narrative",
     context_section="case study narrative",
     triples=[
@@ -111,7 +111,7 @@ case_study_para1_relations = dspy.Example(
 
 case_study_para2_relations = dspy.Example(
     text="""When Julian was a young teenager, his dad died. "His death was self-inflicted," Julian points out. "He'd had rheumatic fever as a child, which gave him an enlarged heart. And the only thing he ever exercised was his right to eat anything fried, including Twinkies. And he smoked—he was a proud two-pack-a-day man. Look where that got him." None of these health risks apply to Julian, who is nothing if not careful about what he puts into his body. He has spent hours searching the Internet for information on diet, and he once attended a lecture by Dean Ornish. "I've followed a plant-based diet ever since," Julian said. "I'm especially keen on tofu. And broccoli." Julian has never complained much about having symptoms—just the odd palpitation, maybe "hot flushes" on an especially humid day. "I don't feel bad," he explains. "I just feel scared." This time, he's heard a report on NPR about young people with heart disease. It startled him so much he dropped the dish he had been putting into the cupboard. Without even cleaning up the mess, he caught the next bus to the ER.""",
-    entities=case_study_para2_entities.result["entities"],
+    entities=case_study_para2_entities["entities"],
     passage_type="case_study_narrative",
     context_section="case study narrative",
     triples=[
@@ -160,4 +160,6 @@ case_study_para2_relations = case_study_para2_relations.with_inputs(
 case_study_para1_relations = case_study_para1_relations.with_inputs(
     "text", "entities", "passage_type", "context_section"
 )
-example_relations = example_relations.with_inputs("text", "entities", "context_section")
+example_relations = example_relations.with_inputs(
+    "text", "entities", "context_section", "passage_type"
+)

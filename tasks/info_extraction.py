@@ -1,6 +1,8 @@
 import pandas as pd
 import dspy
+from dspy import BootstrapFewShot
 import time
+import logging
 from huey import RedisHuey
 from config import settings
 from signatures import (
@@ -12,85 +14,100 @@ from signatures import (
 from tasks.info_extraction_store import store_relation_results, store_entity_results
 
 # ---------------------------
+# Logging setup
+# ---------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("entity_relation_tasks.log"),
+        logging.StreamHandler(),
+    ],
+)
+
+# ---------------------------
 # Huey instances
 # ---------------------------
 huey_extraction = RedisHuey(
     name="entity_relation_tasks",
-    host="192.168.1.24",
+    host="192.168.1.204",
     port=6379,
-    db=0,  # Redis database number
-    password="yourpassword",  # set if your Redis requires password
+    db=0,
+    password="yourpassword",
 )
 
 # ---------------------------
 # dspy / LLM / COT setup
 # ---------------------------
-# Initialize dspy LLM config
-
-dspy_obj = dspy.LM(
+lm = dspy.LM(
     model=settings.llm_model,
     api_base=settings.llm_api_base,
     api_key=settings.llm_api_key,
     timeout=settings.llm_timeout,
 )
 
+dspy.settings.configure(lm=lm, temperature=0.0)
+optimizer = BootstrapFewShot()
 
-# Entity extraction COT with signature
-entity_extraction_cot = dspy.COT(
-    lm=dspy_obj,
-    signature=entity_extraction.DisorderEntityExtractor,
-    few_shot_examples=[
-        # few-shot examples for entity extraction
+entity_extraction_cot_child = dspy.ChainOfThought(
+    entity_extraction.DisorderEntityExtractor
+)
+entity_extraction_cot = optimizer.compile(
+    entity_extraction_cot_child,
+    trainset=[
         entity_example.case_study_para1_entities,
         entity_example.case_study_para2_entities,
         entity_example.example_entities,
     ],
 )
 
-# Relation extraction COT with signature
-relation_extraction_cot = dspy.COT(
-    lm=dspy_obj,
-    signature=relation_extraction.DisorderRelationExtractor,
-    few_shot_examples=[
+relation_extraction_cot_child = dspy.ChainOfThought(
+    relation_extraction.DisorderRelationExtractor
+)
+relation_extraction_cot = optimizer.compile(
+    relation_extraction_cot_child,
+    trainset=[
         relation_examples.case_study_para1_relations,
         relation_examples.case_study_para2_relations,
         relation_examples.example_relations,
     ],
 )
 
-# ---------------------------
-# Huey Tasks
-# ---------------------------
 
-
+# ---------------------------
+# Huey Tasks with logging
+# ---------------------------
 @huey_extraction.task(retries=3, retry_delay=10)
 def call_entity_extraction(content, _path, node_id):
-    """
-    Calls the entity extraction COT for a given text passage.
-    """
+    logging.info(f"Starting entity extraction for node_id={node_id}")
     start_time = time.time()
     try:
-        result = entity_extraction_cot(text=content, context_hierarchy=_path)
+        pred_result = entity_extraction_cot(text=content, context_hierarchy=_path)
         elapsed = time.time() - start_time
-        # Add execution time
+        result = {}
         result["execution_time"] = elapsed
         result["node_id"] = node_id
+        logging.info(
+            f"Entity extraction finished for node_id={node_id} in {elapsed:.2f}s"
+        )
+        result["entities"] = pred_result.entities
+        result["passage_type"] = pred_result.passage_type
 
-        # Store entity extraction results
         store_entity_results(result)
 
-        # If extract    ion is alright, trigger relation extraction
-        if result.get("alright", False):
+        if pred_result.get("alright", False):
+            logging.info(f"Triggering relation extraction for node_id={node_id}")
             extract_relation(
-                entities=result["entities"],
+                entities=pred_result.entities,
                 content=content,
                 _path=_path,
                 node_id=node_id,
-                passage_type=result["passage_type"],  # <- use this
+                passage_type=pred_result.passage_type,
             )
         return result
 
     except Exception as e:
+        logging.error(f"Entity extraction failed for node_id={node_id}: {str(e)}")
         return {
             "node_id": node_id,
             "error": str(e),
@@ -100,23 +117,29 @@ def call_entity_extraction(content, _path, node_id):
 
 @huey_extraction.task(retries=3, retry_delay=10)
 def extract_relation(entities, content, _path, node_id, passage_type):
+    logging.info(f"Starting relation extraction for node_id={node_id}")
     start_time = time.time()
     try:
-        rel_result = relation_extraction_cot(
+        pred_rel_result = relation_extraction_cot(
             text=content,
             entities=entities,
-            passage_type=passage_type,  # <- use the entity extraction output
+            passage_type=passage_type,
             context_section=_path,
         )
         elapsed = time.time() - start_time
+        rel_result = {}
         rel_result["execution_time"] = elapsed
         rel_result["node_id"] = node_id
+        rel_result["triples"] = pred_rel_result.triples
+        logging.info(
+            f"Relation extraction finished for node_id={node_id} in {elapsed:.2f}s"
+        )
 
-        # store results
         store_relation_results(rel_result)
         return rel_result
 
     except Exception as e:
+        logging.error(f"Relation extraction failed for node_id={node_id}: {str(e)}")
         return {
             "node_id": node_id,
             "error": str(e),
@@ -125,14 +148,18 @@ def extract_relation(entities, content, _path, node_id, passage_type):
 
 
 # ---------------------------
-# Example: Read a pandas DF and schedule tasks
+# Schedule tasks with logging
 # ---------------------------
 def schedule_entity_extraction_tasks(df_path: str):
+    logging.info(f"Loading DataFrame from {df_path}")
     df = pd.read_json(df_path, lines=True)
+    df = df[df["node_type_in_tree"] == "leaf"]
+    df = df.iloc[:100]
     for _, row in df.iterrows():
         content = row["content"]
         _path = row["_path"]
         node_id = row["node_id"]
+        logging.info(f"Scheduling entity extraction task for node_id={node_id}")
         call_entity_extraction(content, _path, node_id)
 
 
