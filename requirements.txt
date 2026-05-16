@@ -1,2 +1,4 @@
 docling
 dspy
+huey==2.6.0
+redis==4.6.0

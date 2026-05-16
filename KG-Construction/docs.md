@@ -4,12 +4,14 @@
 1. Assigned unique IDs to all nodes. ✅
 
 ## Next Steps
-2. Build graph paths for each leaf node (to be used in KG construction).   Done.
-2.1. Excluding none content parts...
-3. Test KG construction on the built tree nodes.  
-4. Run KG construction (two-phase entity & relation extraction) using **Huey**.  
+2. Build graph paths for each leaf node (to be used in KG construction).   Done.✅
+2.1. Excluding none content parts... ✅
+3. Test KG construction on the built tree nodes. ✅  
+4. Run KG construction (two-phase entity & relation extraction) using **Huey**.   ✅
 5. Store the constructed KG and create a backup.  
-   - **Important:** Track time and resource usage of KG construction using **gemma4-31B** model.
+   - **Important:** Track time and resource usage of KG construction using **gemma4-31B** model. ✅
+
+5.1 concat the last and first paragraphs two continuing pages and build a new paragraph and create KG ent and rel for each one...
 
 ## Storage
 6. KG may be stored in a database like **Neo4j** or similar.
