@@ -1,6 +1,9 @@
 import logging
-from huey import RedisHuey
+import os
+from pathlib import Path
+
 import pandas as pd
+from huey import RedisHuey
 
 # ---------------------------
 # Logging setup
@@ -22,6 +25,18 @@ huey_storage = RedisHuey(
     password="yourpassword",
 )
 
+ARTIFACT_DIRECTORY = Path(
+    os.getenv("KG_ARTIFACT_DIRECTORY", "books/dsm5-KG/extraction_artifacts")
+)
+
+
+def _write_artifact(kind: str, node_id: str, records: list[dict]) -> Path:
+    """Persist worker output beneath the repository instead of a machine-specific path."""
+    ARTIFACT_DIRECTORY.mkdir(parents=True, exist_ok=True)
+    path = ARTIFACT_DIRECTORY / f"{kind}_{node_id}.json"
+    pd.DataFrame(records).to_json(path, orient="records")
+    return path
+
 
 # ---------------------------
 # Storage Tasks with Logging
@@ -32,9 +47,7 @@ def store_entity_results(result):
     logging.info(f"Storing entity results for node_id={node_id}")
     try:
         entities = result.get("entities", [])
-        pd.DataFrame(entities).to_json(
-            f"~/work/dsm5-KG/entities_{node_id}.json", orient="records"
-        )
+        _write_artifact("entities", node_id, entities)
         logging.info(
             f"Successfully stored entity results for node_id={node_id} ({len(entities)} entities)"
         )
@@ -48,9 +61,7 @@ def store_relation_results(result):
     logging.info(f"Storing relation results for node_id={node_id}")
     try:
         triples = result.get("triples", [])
-        pd.DataFrame(triples).to_json(
-            f"~/work/dsm5-KG/relations_{node_id}.json", orient="records"
-        )
+        _write_artifact("relations", node_id, triples)
         logging.info(
             f"Successfully stored relation results for node_id={node_id} ({len(triples)} triples)"
         )
