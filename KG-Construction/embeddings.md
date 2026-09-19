@@ -56,3 +56,6 @@ Entity vectors are clustered independently for `symptom`, `behavior`,
 uses unique normalized text and writes auditable JSONL assignments under
 `outputs/clustering/`. These are candidate buckets, not automatic merge
 decisions or clinical classes.
+
+The applied consolidation procedure and its before/after snapshot are recorded
+in [`consolidation.md`](consolidation.md).

@@ -7,6 +7,33 @@
 قرارداد اجباری provenance، difficulty subsetها، metricها و research questionها
 در [`evaluation_protocol.md`](evaluation_protocol.md) تعریف شده است.
 
+## وضعیت فعلی پروژه — ۲۰۲۶-۰۹-۱۹
+
+پروژه اکنون به **ابتدای فاز ۳، یعنی پیاده‌سازی شش روش retrieval/reasoning بدون
+Semantic Bridge** رسیده است. زیرساخت لازم برای شروع این مقایسه آماده است:
+
+- استخراج entity و relation از منبع و نگه‌داری provenance انجام شده است؛
+- consolidation نوع‌محور entityها و predicateها انجام و snapshot آن ثبت شده است؛
+- دیتابیس عملیاتی مینیمال با چهار جدول `chunks`، `entities`، `facts` و `mentions`
+  ساخته و با داده‌ی کامل پر شده است؛
+- فقط leaf nodeهای selected وارد `chunks` شده‌اند و chunkهای بدون mention از
+  PostgreSQL و Milvus حذف شده‌اند؛ مجموعه‌ی IDهای باقی‌مانده در دو سیستم برابر
+  است؛
+- endpointهای relation که entity قطعی نداشتند به‌صورت entity مستقل با type برابر
+  `unresolved` حفظ شده‌اند؛ اسکریپت resolve معنایی آن‌ها با شرط
+  `cosine_similarity > 0.87` آماده است، اما اجرای نهایی آن یک مرحله‌ی hardening
+  اختیاری پیش از freeze کردن indexهاست؛
+- collectionهای entity، predicate، triple و source chunk در Milvus ساخته و از
+  نظر schema، تعداد رکورد و سازگاری ID با دیتابیس جدید بررسی شده‌اند؛
+- سیاست semantic seed و traversal تثبیت شده است: `symptom`، `behavior`،
+  `disorder` و conceptهای منتخب برای شروع retrieval هستند و سایر typeها فقط در
+  traversal و context باقی می‌مانند.
+
+بنابراین فعالیت اصلی بعدی، پیاده‌سازی interface مشترک و سپس شش backend فاز ۳
+است. پیش از pilot evaluation باید resolver اختیاری unresolvedها، بازبینی دستی
+نمونه‌ای از merge/non-mergeها و smoke test نهایی retrieval اجرا و سپس snapshot
+دیتابیس، collectionها و configها freeze شود.
+
 ## اصول ثابت آزمایش
 
 - همه‌ی روش‌ها از یک مدل پاسخ‌دهنده، decoding، output schema، سقف context و
