@@ -15,6 +15,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Create and load the DSM PostgreSQL knowledge graph")
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="Repository root containing books/")
     parser.add_argument("--validate-only", action="store_true", help="Validate files and print counts; no DB needed")
+    parser.add_argument("--audit-only", action="store_true", help="Print a compact read-only database audit")
     parser.add_argument("--dsn", default=os.getenv("DSM_KG_DATABASE_URL"), help="Target PostgreSQL DSN")
     parser.add_argument("--create-database", action="store_true", help="Create the target database before loading")
     parser.add_argument("--admin-dsn", default=os.getenv("POSTGRES_ADMIN_DSN"), help="Administrative DSN, normally connected to postgres")
@@ -30,6 +31,17 @@ def main() -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     paths = DatasetPaths(args.root.resolve())
+    if args.audit_only:
+        if not args.dsn:
+            raise SystemExit("--dsn (or DSM_KG_DATABASE_URL) is required to audit PostgreSQL")
+        try:
+            import psycopg
+        except ImportError as error:
+            raise SystemExit("Install dependencies first: pip install -r requirements.txt") from error
+        from .audit import print_audit
+        with psycopg.connect(args.dsn) as connection:
+            print_audit(connection)
+        return 0
     logging.getLogger(__name__).info("Validating source artifacts under %s", paths.root)
     report = validate_dataset(paths)
     for key, value in vars(report).items():

@@ -1,0 +1,61 @@
+{
+  "purpose": "consolidation_candidate_generation_not_clinical_classes",
+  "seed_eligible_entity_types": [
+    "symptom",
+    "behavior",
+    "disorder",
+    "concept"
+  ],
+  "groups": [
+    {
+      "group": "symptom",
+      "unique_texts": 11352,
+      "mentions": 25502,
+      "clusters": 320,
+      "mean_unique_texts_per_cluster": 35.48,
+      "mean_cosine_to_centroid": 0.794536,
+      "minimum_cosine_to_centroid": 0.342523,
+      "output": "outputs/clustering/symptom_clusters.jsonl"
+    },
+    {
+      "group": "behavior",
+      "unique_texts": 919,
+      "mentions": 1164,
+      "clusters": 61,
+      "mean_unique_texts_per_cluster": 15.07,
+      "mean_cosine_to_centroid": 0.733142,
+      "minimum_cosine_to_centroid": 0.331264,
+      "output": "outputs/clustering/behavior_clusters.jsonl"
+    },
+    {
+      "group": "disorder",
+      "unique_texts": 3543,
+      "mentions": 21283,
+      "clusters": 208,
+      "mean_unique_texts_per_cluster": 17.03,
+      "mean_cosine_to_centroid": 0.853866,
+      "minimum_cosine_to_centroid": 0.347798,
+      "output": "outputs/clustering/disorder_clusters.jsonl"
+    },
+    {
+      "group": "concept",
+      "unique_texts": 10223,
+      "mentions": 22673,
+      "clusters": 303,
+      "mean_unique_texts_per_cluster": 33.74,
+      "mean_cosine_to_centroid": 0.773368,
+      "minimum_cosine_to_centroid": 0.362597,
+      "output": "outputs/clustering/concept_clusters.jsonl"
+    },
+    {
+      "group": "predicate",
+      "unique_texts": 6705,
+      "mentions": 6705,
+      "clusters": 246,
+      "mean_unique_texts_per_cluster": 27.26,
+      "mean_cosine_to_centroid": 0.821995,
+      "minimum_cosine_to_centroid": 0.417385,
+      "output": "outputs/clustering/predicate_clusters.jsonl"
+    }
+  ]
+}

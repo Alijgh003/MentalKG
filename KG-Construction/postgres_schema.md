@@ -15,6 +15,10 @@ nodes ──< node_page_spans
 
 nodes ──< entity_mentions
 nodes ──< relation_mentions ──< relation_entity_links >── entity_mentions
+
+canonical_entities ──< entity_mentions
+canonical_predicates ──< relation_mentions
+entity_consolidation_runs ──< canonical entities / predicates
 nodes ──< kg_source_records >── ingestion_sources
 ```
 
@@ -28,24 +32,38 @@ nodes ──< kg_source_records >── ingestion_sources
 - `entity_mentions` and `relation_mentions` are extraction outputs. Their raw
   model payloads remain available, and exact in-node subject/object matches are
   represented by `relation_entity_links`.
+- Consolidation never deletes source mentions. Every processed mention points
+  to a row in `canonical_entities`, while the canonical row identifies its
+  representative mention. Predicate mentions use the analogous
+  `canonical_predicates` mapping. Match kind and direct cosine similarity are
+  retained on each mention for auditability.
 - `kg_source_records` preserves the irregular wide main-KG records and every
   split boundary entity/relation artifact unchanged.
 
 Run a read-only check first:
 
 ```bash
-python3 -m kg_pipeline.cli --root . --validate-only
+python3 -m kg_pipeline.cli --root /home/alihoosh/projects/kg-books --validate-only
+```
+
+Start the local database (copy `.env.example` to `.env` and change the password):
+
+```bash
+docker compose up -d postgres
 ```
 
 Create and populate PostgreSQL (after `pip install -r requirements.txt`):
 
 ```bash
 python3 -m kg_pipeline.cli \
-  --root . \
-  --create-database \
-  --admin-dsn 'postgresql://USER:PASSWORD@HOST:5432/postgres' \
-  --database-name dsm5_kg \
-  --dsn 'postgresql://USER:PASSWORD@HOST:5432/dsm5_kg'
+  --root /home/alihoosh/projects/kg-books \
+  --dsn "$DSM_KG_DATABASE_URL"
+```
+
+Print a compact database consistency report without dumping data:
+
+```bash
+python3 -m kg_pipeline.cli --audit-only --dsn "$DSM_KG_DATABASE_URL"
 ```
 
 The importer is idempotent: it upserts normalized records and replaces matching

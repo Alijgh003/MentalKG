@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dsm5_kg}
+      POSTGRES_USER: ${POSTGRES_USER:-dsm5}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - dsm5_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  milvus:
+    image: milvusdb/milvus:v3.0.1
+    restart: unless-stopped
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_USE_EMBED: "true"
+      ETCD_DATA_DIR: /var/lib/milvus/etcd
+      ETCD_CONFIG_PATH: /milvus/configs/embedEtcd.yaml
+      COMMON_STORAGETYPE: local
+      DEPLOY_MODE: STANDALONE
+    ports:
+      - "127.0.0.1:${MILVUS_PORT:-19530}:19530"
+      - "127.0.0.1:${MILVUS_WEB_PORT:-9091}:9091"
+    volumes:
+      - milvus_data:/var/lib/milvus
+      - ./milvus/embedEtcd.yaml:/milvus/configs/embedEtcd.yaml:ro
+      - ./milvus/user.yaml:/milvus/configs/user.yaml:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 15s
+      timeout: 10s
+      start_period: 90s
+      retries: 6
+
+volumes:
+  dsm5_postgres_data:
+  milvus_data:

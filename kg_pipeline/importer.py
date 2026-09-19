@@ -16,6 +16,7 @@ from .schema import create_schema
 
 ENTITY_NAMESPACE = uuid.UUID("dc2f570e-4c55-47c8-95af-d217a7f77e60")
 RELATION_NAMESPACE = uuid.UUID("dc95d476-301a-44b1-929a-224adb2177c1")
+IMPORTER_VERSION = "2"
 logger = logging.getLogger(__name__)
 
 
@@ -34,6 +35,23 @@ def _normalise_name(value: str | None) -> str:
     return (value or "").strip().casefold()
 
 
+def _wide_records(row: dict[str, Any], kind: str) -> list[dict[str, Any]]:
+    """Read both named and accidentally numeric pandas-generated KG columns."""
+    required = {"name"} if kind == "entity" else {"subject", "predicate", "object"}
+    records: list[tuple[int, dict[str, Any]]] = []
+    for key, value in row.items():
+        if not isinstance(value, dict) or not required.issubset(value):
+            continue
+        if key.endswith(f"_{kind}"):
+            prefix = key.removesuffix(f"_{kind}")
+        elif key.isdigit():
+            prefix = key
+        else:
+            continue
+        records.append((int(prefix) if prefix.isdigit() else len(records), value))
+    return [value for _, value in sorted(records, key=lambda item: item[0])]
+
+
 class PostgresImporter:
     """Load raw pages, trees, derived passages, entities, and triples.
 
@@ -45,7 +63,8 @@ class PostgresImporter:
     def __init__(self, connection, paths: DatasetPaths):
         self.connection = connection
         self.paths = paths
-        self._entity_by_name: dict[tuple[str, str, str], uuid.UUID] = {}
+        self._entity_by_name: dict[tuple[str, str, str], list[uuid.UUID]] = {}
+        self.run_id = uuid.uuid4()
 
     def load(self) -> None:
         """Create the schema and load all known DSM artifacts in FK-safe order.
@@ -54,18 +73,66 @@ class PostgresImporter:
         immediately to other database clients and makes a failed long-running
         import safely resumable through the existing upserts.
         """
-        logger.info("Starting full DSM knowledge-graph import")
+        logger.info("Starting full DSM knowledge-graph import (run %s)", self.run_id)
         self._run_phase("schema", lambda: create_schema(self.connection), pipelined=False)
-        self._run_phase("source registration", self._register_static_sources)
-        self._run_phase("raw pages", self._load_raw_pages)
-        self._run_phase("parsed page results", self._load_page_parse_results)
-        self._run_phase("complete tree", lambda: self._load_tree(self.paths.complete_tree, selected=False))
-        self._run_phase("selected tree", lambda: self._load_tree(self.paths.selected_tree, selected=True))
-        self._run_phase("derived page-boundary nodes", self._load_boundary_nodes)
-        self._run_phase("rejected nodes", self._load_rejected_nodes)
-        self._run_phase("main KG", self._load_main_kg)
-        self._run_phase("boundary KG", self._load_boundary_kg)
-        logger.info("DSM knowledge-graph import finished")
+        self._start_run()
+        try:
+            self._run_phase("source registration", self._register_static_sources)
+            self._run_phase("raw pages", self._load_raw_pages)
+            self._run_phase("parsed page results", self._load_page_parse_results)
+            self._run_phase("complete tree", lambda: self._load_tree(self.paths.complete_tree, selected=False))
+            self._run_phase("selected tree", lambda: self._load_tree(self.paths.selected_tree, selected=True))
+            self._run_phase("derived page-boundary nodes", self._load_boundary_nodes)
+            self._run_phase("rejected nodes", self._load_rejected_nodes)
+            self._run_phase("main KG", self._load_main_kg)
+            self._run_phase("boundary KG", self._load_boundary_kg)
+            self._run_phase("final audit", self._finish_run, pipelined=False)
+        except BaseException as error:
+            self.connection.rollback()
+            self._fail_run(error)
+            raise
+        logger.info("DSM knowledge-graph import finished (run %s)", self.run_id)
+
+    def _start_run(self) -> None:
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """INSERT INTO ingestion_runs(run_id, status, source_root, importer_version)
+                   VALUES (%s, 'running', %s, %s)""",
+                (self.run_id, str(self.paths.data_root), IMPORTER_VERSION),
+            )
+        self.connection.commit()
+
+    def _finish_run(self) -> None:
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT jsonb_build_object(
+                       'documents', (SELECT count(*) FROM documents),
+                       'pages', (SELECT count(*) FROM pages),
+                       'nodes', (SELECT count(*) FROM nodes),
+                       'entities', (SELECT count(*) FROM entity_mentions),
+                       'relations', (SELECT count(*) FROM relation_mentions),
+                       'linked_endpoints', (SELECT count(*) FROM relation_entity_links),
+                       'endpoint_issues', (SELECT count(*) FROM relation_ingestion_issues)
+                   )"""
+            )
+            summary = cursor.fetchone()[0]
+            cursor.execute(
+                """UPDATE ingestion_runs SET status='completed', completed_at=now(), summary=%s::jsonb
+                   WHERE run_id=%s""",
+                (_json(summary), self.run_id),
+            )
+
+    def _fail_run(self, error: BaseException) -> None:
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute(
+                    """UPDATE ingestion_runs SET status='failed', completed_at=now(), error_message=%s
+                       WHERE run_id=%s""",
+                    (str(error)[:4000], self.run_id),
+                )
+            self.connection.commit()
+        except Exception:
+            logger.exception("Could not record failed ingestion run")
 
     def _run_phase(self, name: str, action, *, pipelined: bool = True) -> None:
         """Execute, flush, and commit one visible/resumable import phase."""
@@ -112,15 +179,16 @@ class PostgresImporter:
         with self.connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO ingestion_sources(source_path, source_role, sha256, byte_size)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO ingestion_sources(source_path, source_role, sha256, byte_size, last_run_id)
+                VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (source_path) DO UPDATE SET
                     source_role = EXCLUDED.source_role,
                     sha256 = EXCLUDED.sha256,
                     byte_size = EXCLUDED.byte_size,
-                    imported_at = now()
+                    imported_at = now(),
+                    last_run_id = EXCLUDED.last_run_id
                 """,
-                (source_path, role, digest.hexdigest(), path.stat().st_size),
+                (source_path, role, digest.hexdigest(), path.stat().st_size, self.run_id),
             )
         return source_path
 
@@ -258,6 +326,15 @@ class PostgresImporter:
                     """,
                     (source_path, row["node_id"], _json(row)),
                 )
+                if selected and row["node_type_in_tree"] == "leaf":
+                    cursor.execute(
+                        """INSERT INTO node_extraction_status(node_id, extraction_set, status)
+                           VALUES (%s, 'main_kg', 'missing')
+                           ON CONFLICT (node_id, extraction_set) DO UPDATE SET
+                             status='missing', has_entities=FALSE, has_relations=FALSE,
+                             detail=NULL, updated_at=now()""",
+                        (row["node_id"],),
+                    )
                 cursor.execute(
                     """
                     INSERT INTO node_page_spans(node_id, document_code, page_number, span_role)
@@ -332,6 +409,14 @@ class PostgresImporter:
                     """,
                     (node_id, original_node_id, document_code, continuation_page, row.get("next_page")),
                 )
+                cursor.execute(
+                    """INSERT INTO node_extraction_status(node_id, extraction_set, status)
+                       VALUES (%s, 'boundary_kg', 'missing')
+                       ON CONFLICT (node_id, extraction_set) DO UPDATE SET
+                         status='missing', has_entities=FALSE, has_relations=FALSE,
+                         detail=NULL, updated_at=now()""",
+                    (node_id,),
+                )
             self._progress("Derived page-boundary nodes", count)
         logger.info("Loaded %s derived page-boundary nodes", count)
 
@@ -351,6 +436,13 @@ class PostgresImporter:
                     """,
                     (source_path, row["node_id"], _json(row)),
                 )
+                cursor.execute(
+                    """INSERT INTO node_extraction_status(node_id, extraction_set, status, detail)
+                       VALUES (%s, 'main_kg', 'rejected', %s::jsonb)
+                       ON CONFLICT (node_id, extraction_set) DO UPDATE SET
+                         status='rejected', detail=EXCLUDED.detail, updated_at=now()""",
+                    (row["node_id"], _json(row)),
+                )
         logger.info("Loaded %s rejected main-KG node records", count)
 
     def _load_main_kg(self) -> None:
@@ -359,16 +451,11 @@ class PostgresImporter:
         for ordinal, row in _jsonl(self.paths.main_kg):
             node_id = row["node_id"]
             self._store_source_record(source_path, ordinal, node_id, "main_kg", "combined", row)
-            entities = [
-                value for key, value in row.items()
-                if key.endswith("_entity") and isinstance(value, dict)
-            ]
-            relations = [
-                value for key, value in row.items()
-                if key.endswith("_relation") and isinstance(value, dict)
-            ]
+            entities = _wide_records(row, "entity")
+            relations = _wide_records(row, "relation")
             self._store_entities("main_kg", source_path, node_id, entities)
             self._store_relations("main_kg", source_path, node_id, relations)
+            self._set_extraction_status(node_id, "main_kg", entities, relations)
             self._progress("Main KG", ordinal + 1)
         logger.info("Loaded %s main-KG records", ordinal + 1)
 
@@ -385,6 +472,7 @@ class PostgresImporter:
             payload = json.loads(path.read_text(encoding="utf-8"))
             self._store_source_record(source_path, 0, node_id, "boundary_kg", "entities", payload)
             self._store_entities("boundary_kg", source_path, node_id, payload)
+            self._set_extraction_status(node_id, "boundary_kg", payload, None)
             self._progress("Boundary KG entity artifacts", ordinal, interval=250)
         for ordinal, path in enumerate(relation_files, start=1):
             source_path = self._register_source(path, "boundary_kg_relations")
@@ -392,6 +480,7 @@ class PostgresImporter:
             payload = json.loads(path.read_text(encoding="utf-8"))
             self._store_source_record(source_path, 0, node_id, "boundary_kg", "relations", payload)
             self._store_relations("boundary_kg", source_path, node_id, payload)
+            self._set_extraction_status(node_id, "boundary_kg", None, payload)
             self._progress("Boundary KG relation artifacts", ordinal, interval=250)
         logger.info("Loaded %s boundary entity artifacts and %s boundary relation artifacts", len(entity_files), len(relation_files))
 
@@ -417,6 +506,13 @@ class PostgresImporter:
     def _store_entities(
         self, extraction_set: str, source_path: str, node_id: str, entities: list[dict[str, Any]],
     ) -> None:
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM entity_mentions WHERE extraction_set=%s AND source_path=%s AND node_id=%s",
+                (extraction_set, source_path, node_id),
+            )
+        for cache_key in [key for key in self._entity_by_name if key[:2] == (extraction_set, node_id)]:
+            del self._entity_by_name[cache_key]
         for ordinal, entity in enumerate(entities):
             name = entity.get("name")
             if not isinstance(name, str) or not name.strip():
@@ -444,12 +540,17 @@ class PostgresImporter:
                     ),
                 )
             self._entity_by_name.setdefault(
-                (extraction_set, node_id, _normalise_name(name)), entity_id
-            )
+                (extraction_set, node_id, _normalise_name(name)), []
+            ).append(entity_id)
 
     def _store_relations(
         self, extraction_set: str, source_path: str, node_id: str, relations: list[dict[str, Any]],
     ) -> None:
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM relation_mentions WHERE extraction_set=%s AND source_path=%s AND node_id=%s",
+                (extraction_set, source_path, node_id),
+            )
         for ordinal, relation in enumerate(relations):
             subject, predicate, object_ = (
                 relation.get("subject"), relation.get("predicate"), relation.get("object")
@@ -479,10 +580,11 @@ class PostgresImporter:
                     ),
                 )
                 for endpoint_role, endpoint_text in (("subject", subject), ("object", object_)):
-                    entity_id = self._entity_by_name.get(
-                        (extraction_set, node_id, _normalise_name(endpoint_text))
+                    normalized = _normalise_name(endpoint_text)
+                    candidates = self._entity_by_name.get(
+                        (extraction_set, node_id, normalized), []
                     )
-                    if entity_id:
+                    if len(candidates) == 1:
                         cursor.execute(
                             """
                             INSERT INTO relation_entity_links(relation_mention_id, entity_mention_id, endpoint_role)
@@ -490,8 +592,40 @@ class PostgresImporter:
                             ON CONFLICT (relation_mention_id, endpoint_role) DO UPDATE SET
                                 entity_mention_id = EXCLUDED.entity_mention_id
                             """,
-                            (relation_id, entity_id, endpoint_role),
+                            (relation_id, candidates[0], endpoint_role),
                         )
+                    else:
+                        cursor.execute(
+                            """INSERT INTO relation_ingestion_issues(
+                                   relation_mention_id, endpoint_role, issue_kind, endpoint_text, candidate_count
+                               ) VALUES (%s, %s, %s, %s, %s)
+                               ON CONFLICT (relation_mention_id, endpoint_role) DO UPDATE SET
+                                 issue_kind=EXCLUDED.issue_kind, endpoint_text=EXCLUDED.endpoint_text,
+                                 candidate_count=EXCLUDED.candidate_count""",
+                            (relation_id, endpoint_role, "unmatched" if not candidates else "ambiguous", endpoint_text, len(candidates)),
+                        )
+
+    def _set_extraction_status(
+        self, node_id: str, extraction_set: str,
+        entities: list[dict[str, Any]] | None, relations: list[dict[str, Any]] | None,
+    ) -> None:
+        has_entities = bool(entities) if entities is not None else False
+        has_relations = bool(relations) if relations is not None else False
+        status = "success" if has_entities or has_relations else "empty"
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """INSERT INTO node_extraction_status(
+                       node_id, extraction_set, status, has_entities, has_relations
+                   ) VALUES (%s, %s, %s, %s, %s)
+                   ON CONFLICT (node_id, extraction_set) DO UPDATE SET
+                     has_entities=node_extraction_status.has_entities OR EXCLUDED.has_entities,
+                     has_relations=node_extraction_status.has_relations OR EXCLUDED.has_relations,
+                     status=CASE WHEN node_extraction_status.has_entities OR EXCLUDED.has_entities
+                                       OR node_extraction_status.has_relations OR EXCLUDED.has_relations
+                                 THEN 'success' ELSE EXCLUDED.status END,
+                     updated_at=now()""",
+                (node_id, extraction_set, status, has_entities, has_relations),
+            )
 
 
 def create_database(admin_dsn: str, database_name: str) -> None:

@@ -18,40 +18,46 @@ class DatasetPaths:
     root: Path
 
     @property
+    def data_root(self) -> Path:
+        """Return either a repository's ``books`` directory or a direct data directory."""
+        nested = self.root / "books"
+        return nested if nested.is_dir() else self.root
+
+    @property
     def raw_pages(self) -> Path:
-        return self.root / "books/dsm5_all.csv"
+        return self.data_root / "dsm5_all.csv"
 
     @property
     def parsed_pages(self) -> Path:
-        return self.root / "books/dsm-tree/dsm5-final.jsonl"
+        return self.data_root / "dsm-tree/dsm5-final.jsonl"
 
     @property
     def complete_tree(self) -> Path:
-        return self.root / "books/dsm-tree/tree_with_IDs.json"
+        return self.data_root / "dsm-tree/tree_with_IDs.json"
 
     @property
     def selected_tree(self) -> Path:
-        return self.root / "books/dsm-tree/dsm5_selected_chapters_tree.jsonl"
+        return self.data_root / "dsm-tree/dsm5_selected_chapters_tree.jsonl"
 
     @property
     def boundary_nodes(self) -> Path:
-        return self.root / "books/dsm-tree/last_concated_with_first_nodes.jsonl"
+        return self.data_root / "dsm-tree/last_concated_with_first_nodes.jsonl"
 
     @property
     def main_kg(self) -> Path:
-        return self.root / "books/dsm5-KG/dsm5-KG.jsonl"
+        return self.data_root / "dsm5-KG/dsm5-KG.jsonl"
 
     @property
     def rejected_nodes(self) -> Path:
-        return self.root / "books/dsm5-KG/dsm5-bad_nodes.jsonl"
+        return self.data_root / "dsm5-KG/dsm5-bad_nodes.jsonl"
 
     @property
     def boundary_kg_dir(self) -> Path:
-        return self.root / "books/dsm5-KG/last_first_kg/dsm5-KG"
+        return self.data_root / "dsm5-KG/last_first_kg/dsm5-KG"
 
     def relative_name(self, path: Path) -> str:
         """Return a stable source identifier stored in the database."""
-        return path.resolve().relative_to(self.root.resolve()).as_posix()
+        return path.resolve().relative_to(self.data_root.resolve()).as_posix()
 
     def required_files(self) -> tuple[Path, ...]:
         return (
