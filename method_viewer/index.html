@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>HippoRAG Run Viewer</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">H₂</span>
+      <div><h1>Run Viewer</h1><p>Follow a sample through the retrieval pipeline</p></div>
+    </div>
+    <label class="run-control"><span>Experiment run</span><select id="run-select" aria-label="Experiment run"></select></label>
+  </header>
+
+  <main class="shell">
+    <aside class="samples-panel">
+      <div class="panel-heading"><div><span class="eyebrow">DATASET SAMPLES</span><strong id="sample-count">0 samples</strong></div></div>
+      <div id="sample-list" class="sample-list"></div>
+    </aside>
+
+    <section class="workspace">
+      <div id="empty-state" class="empty-state"><div class="empty-glyph">↗</div><h2>Select a run</h2><p>Your generated triples and retrieved facts will appear here.</p></div>
+      <div id="sample-view" hidden>
+        <section class="sample-header">
+          <div><span id="sample-location" class="eyebrow"></span><h2 id="sample-id"></h2></div>
+          <div id="sample-stats" class="stats"></div>
+        </section>
+
+        <details class="query-card">
+          <summary><span>Input post and question</span><span class="summary-hint">click to expand</span></summary>
+          <p id="input-text"></p>
+        </details>
+
+        <nav id="stage-tabs" class="stage-tabs" aria-label="Pipeline stages"></nav>
+        <section id="stage-content" class="stage-content"></section>
+      </div>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

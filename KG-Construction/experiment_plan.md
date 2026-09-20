@@ -29,8 +29,12 @@ Semantic Bridge** رسیده است. زیرساخت لازم برای شروع �
   `disorder` و conceptهای منتخب برای شروع retrieval هستند و سایر typeها فقط در
   traversal و context باقی می‌مانند.
 
-بنابراین فعالیت اصلی بعدی، پیاده‌سازی interface مشترک و سپس شش backend فاز ۳
-است. پیش از pilot evaluation باید resolver اختیاری unresolvedها، بازبینی دستی
+interface مشترک اجرای روش‌ها و نخستین backend فاز ۳، یعنی **HippoRAG 2-style**،
+اکنون پیاده‌سازی شده‌اند. این backend از fact retrieval، Recognition Memory
+اختیاری مبتنی بر DSPy، seedهای type-aware، dense passage seed و weighted PPR
+استفاده می‌کند و runner مشترک می‌تواند تعداد مشخصی sample یا کل split را اجرا
+کند. فعالیت اصلی بعدی تکمیل پنج backend دیگر و افزودن prediction/QA مشترک است.
+پیش از pilot evaluation باید resolver اختیاری unresolvedها، بازبینی دستی
 نمونه‌ای از merge/non-mergeها و smoke test نهایی retrieval اجرا و سپس snapshot
 دیتابیس، collectionها و configها freeze شود.
 
