@@ -35,7 +35,8 @@ class EvidenceAnswerer:
 
             Do not invent facts or transfer details from a passage to the poster.
             Association, comorbidity, or one nonspecific observation is not sufficient.
-            Return exactly one of the supplied valid labels. If evidence is insufficient,
+            Return exactly one of the supplied valid labels (never a label invented by
+            the model). If evidence is insufficient,
             use the supplied label representing no disorder when one exists. Mention
             only passage IDs returned in
             `cited_passage_ids`, cite only passages that affect the decision, and keep
@@ -106,9 +107,13 @@ class EvidenceAnswerer:
                 if set(normalized_labels) == {"yes", "no"}
                 else []
             )
+            labeled_question = (
+                f"{question}\n\nAllowed answer labels (choose exactly one): "
+                f"{', '.join(valid_labels)}"
+            )
             with dspy.context(lm=self.lm):
                 prediction = self.program(
-                    question=question,
+                    question=labeled_question,
                     evidence=evidence,
                     valid_labels=list(valid_labels),
                 )

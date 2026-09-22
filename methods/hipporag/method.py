@@ -237,7 +237,16 @@ class HippoRAG2Method:
                     }],
                 })
                 selected_ids = set(filtered.selected_ids)
-                candidates = [row for row in candidates if row["id"] in selected_ids]
+                selected_candidates = [row for row in candidates if row["id"] in selected_ids]
+                # Keep the filter's choices first, then backfill from the ranked
+                # shortlist so a conservative judge cannot collapse the fact
+                # evidence below the configured final_fact_top_k.
+                selected_candidates.extend(
+                    row for row in candidates
+                    if row["id"] not in selected_ids
+                    and len(selected_candidates) < self.config.final_fact_top_k
+                )
+                candidates = selected_candidates
             candidates.sort(key=lambda row: row["raw_score"], reverse=True)
             # Normalize only the globally filtered pool, then enforce the final
             # graph-seed limit even if a provider returned too many IDs.
@@ -323,10 +332,14 @@ class HippoRAG2Method:
         self.last_stages = recorder.events
         stage_outputs: dict[str, object] = {}
         self._last_filter_usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "queries": []}
+        labeled_query = (
+            f"{sample.text}\n\nAllowed answer labels (use these labels as the task label set): "
+            f"{', '.join(sample.valid_labels)}"
+        )
 
         with recorder.stage("fact_generation", mode=self.config.recognition_mode) as event:
             event["llm_calls"] = 1 if self.config.recognition_mode == "llm" else 0
-            generation = self.recognizer.generate(sample.text)
+            generation = self.recognizer.generate(labeled_query)
             event["input_tokens"] = generation.input_tokens
             event["output_tokens"] = generation.output_tokens
             event["details"]["generated_triples"] = len(generation.triples)
@@ -347,7 +360,7 @@ class HippoRAG2Method:
                 method_metadata={"recognition": recognition_metadata},
             )
 
-        fact_candidates = self._fact_candidates(generation.triples, sample.text, recorder)
+        fact_candidates = self._fact_candidates(generation.triples, labeled_query, recorder)
         stage_outputs["fact_filtering"] = self._last_filter_usage["queries"]
         with recorder.stage("fact_endpoint_lookup", facts=len(fact_candidates)):
             endpoints = self._load_fact_endpoints([fact["id"] for fact in fact_candidates])
@@ -362,7 +375,7 @@ class HippoRAG2Method:
                 method_metadata={"recognition": recognition_metadata},
             )
 
-        passage_candidates = self._passage_candidates(sample.text, recorder)
+        passage_candidates = self._passage_candidates(labeled_query, recorder)
         passage_candidates = [
             row for row in passage_candidates
             if row["raw_score"] >= self.config.passage_similarity_threshold
@@ -573,6 +586,7 @@ class HippoRAG2Method:
             event["details"].update({
                 "answer": answer.answer,
                 "citations": list(answer.cited_passage_ids),
+                "valid_labels": list(sample.valid_labels),
             })
         normalized = answer.answer.casefold().strip().rstrip(".")
         result.labels = [normalized] if normalized else []

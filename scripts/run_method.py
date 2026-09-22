@@ -68,11 +68,15 @@ def parser() -> argparse.ArgumentParser:
     size = result.add_mutually_exclusive_group()
     size.add_argument("--limit", type=int, help="Number of samples; default is 10")
     size.add_argument("--all", action="store_true", help="Run the complete split")
+    size.add_argument(
+        "--row-indices",
+        help="Comma-separated zero-based dataset row indices (useful for stratified samples)",
+    )
     result.add_argument("--offset", type=int, default=0)
     result.add_argument("--method-option", action="append", default=[], metavar="KEY=VALUE")
     result.add_argument(
         "--stop-after",
-        choices=("fact_generation", "fact_retrieval", "passage_retrieval", "seed_weighting", "ppr", "passage_ranking", "answer_generation"),
+        choices=("fact_generation", "fact_retrieval", "passage_retrieval", "reranking", "seed_weighting", "ppr", "passage_ranking", "answer_generation"),
         help="Stop at this pipeline boundary and print that stage's output",
     )
     result.add_argument("--output", type=Path)
@@ -194,8 +198,24 @@ def main() -> int:
         parser().error("--offset cannot be negative")
 
     options = parse_options(args.method_option)
-    limit = None if args.all else (args.limit or 10)
-    samples = load_samples(args.dataset, args.split, limit=limit, offset=args.offset)
+    if args.row_indices:
+        try:
+            row_indices = [int(value.strip()) for value in args.row_indices.split(",") if value.strip()]
+        except ValueError as error:
+            parser.error(f"--row-indices must contain integers: {error}")
+        if not row_indices or any(index < 0 for index in row_indices):
+            parser.error("--row-indices must contain at least one non-negative integer")
+        if len(set(row_indices)) != len(row_indices):
+            parser.error("--row-indices must not contain duplicates")
+        all_samples = load_samples(args.dataset, args.split, limit=None, offset=0)
+        by_index = {sample.dataset_row_index: sample for sample in all_samples}
+        missing = [index for index in row_indices if index not in by_index]
+        if missing:
+            parser.error(f"Dataset rows not found: {missing}")
+        samples = [by_index[index] for index in row_indices]
+    else:
+        limit = None if args.all else (args.limit or 10)
+        samples = load_samples(args.dataset, args.split, limit=limit, offset=args.offset)
     if not samples:
         raise SystemExit("No samples selected")
 

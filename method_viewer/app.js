@@ -5,6 +5,7 @@ const stageNames = {
   fact_generation: "Generated triples",
   fact_retrieval: "Retrieved facts",
   passage_retrieval: "Dense chunks",
+  reranking: "Reranked chunks",
   seed_weighting: "Entity seeds",
   ppr: "PPR nodes",
   passage_ranking: "Final chunks",
@@ -68,7 +69,10 @@ function selectSample(index) {
   const generated = sample.stage_outputs?.fact_generation?.length ?? 0;
   const facts = sample.stage_outputs?.fact_retrieval?.length ?? 0;
   const latency = sample.cost?.latency_ms;
-  $("sample-stats").innerHTML = stat("Queries", generated) + stat("Facts", facts) + stat("Latency", latency == null ? "—" : `${(latency / 1000).toFixed(2)}s`);
+  const gold = sample.gold?.label || "—";
+  const predicted = sample.output?.labels?.[0] || "—";
+  const match = predicted !== "—" && gold !== "—" && String(predicted).toLowerCase() === String(gold).toLowerCase();
+  $("sample-stats").innerHTML = stat("Gold answer", gold) + stat("Model answer", predicted) + stat("Match", match ? "✓" : (predicted === "—" ? "—" : "✗")) + stat("Queries", generated) + stat("Facts", facts) + stat("Latency", latency == null ? "—" : `${(latency / 1000).toFixed(2)}s`);
   renderTabs(stages);
   renderStage();
 }
@@ -88,6 +92,7 @@ function renderStage() {
   else if (state.stage === "fact_retrieval") content.innerHTML = renderFacts(data || [], sample);
   else if (state.stage === "ppr") content.innerHTML = renderPpr(data || {});
   else if (state.stage === "seed_weighting") content.innerHTML = renderSeeds(data || []);
+  else if (state.stage === "reranking") content.innerHTML = renderReranked(data || []);
   else if (state.stage === "answer_generation") content.innerHTML = renderAnswer(data || {});
   else content.innerHTML = renderPassages(data || []);
 }
@@ -133,10 +138,19 @@ function renderPassages(rows) {
   return sectionIntro(stageNames[state.stage] || "Stage output", "Retrieved source text ordered by relevance.", `${rows.length} chunks`) + (rows.length ? `<div class="passage-list">${rows.map(row => `<article><div><b>#${row.rank}</b><code>${shortId(row.passage_id)}</code><strong>${fmt(row.score, 5)}</strong></div><p>${escapeHtml(row.text || "No hydrated text recorded at this stage.")}</p></article>`).join("")}</div>` : emptyBox());
 }
 
+function renderReranked(rows) {
+  return sectionIntro("Reranked chunks", "Dense candidates reordered by the configured reranking endpoint.", `${rows.length} chunks`) + (rows.length ? `<div class="passage-list">${rows.map(row => `<article><div><b>#${row.rank}</b><code>${shortId(row.passage_id)}</code><strong>${fmt(row.rerank_score, 5)} rerank</strong></div><small>dense #${row.dense_rank} · ${fmt(row.dense_score, 5)}</small><p>${escapeHtml(row.text || "No hydrated text recorded at this stage.")}</p></article>`).join("")}</div>` : emptyBox());
+}
+
 function renderAnswer(data) {
+  const sample = state.run.samples[state.sampleIndex];
   const citations = data.cited_passage_ids || [];
-  return sectionIntro("Evidence-grounded answer", "Generated from the five highest-ranked final chunks.", data.answer || "—") +
-    `<article class="triple-card"><span class="query-id">FINAL ANSWER</span><h3>${escapeHtml(data.answer || "No answer")}</h3><p>${escapeHtml(data.explanation || "No explanation was returned.")}</p><span class="detail-label">Cited passages</span><div>${citations.length ? citations.map(id => `<code>${escapeHtml(id)}</code>`).join("<br>") : "No valid citations returned."}</div></article>`;
+  const gold = sample.gold?.label || "—";
+  const predicted = data.answer || "—";
+  const match = predicted !== "—" && gold !== "—" && String(predicted).toLowerCase() === String(gold).toLowerCase();
+  return sectionIntro("Evidence-grounded answer", "Generated from the highest-ranked evidence passages.", predicted) +
+    `<div class="metric-strip">${stat("Gold answer", gold)}${stat("Model answer", predicted)}${stat("Result", match ? "Correct" : "Different")}</div>` +
+    `<article class="triple-card"><span class="query-id">MODEL EXPLANATION</span><p>${escapeHtml(data.explanation || "No explanation was returned.")}</p><span class="detail-label">Cited passages</span><div>${citations.length ? citations.map(id => `<code>${escapeHtml(id)}</code>`).join("<br>") : "No valid citations returned."}</div></article>`;
 }
 
 function emptyBox() { return `<div class="empty-box">Nothing to display at this stage.</div>`; }

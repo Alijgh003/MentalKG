@@ -12,6 +12,7 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 
 UNRESOLVED_ENTITY_NAMESPACE = uuid.UUID("a14f9d0d-327c-46af-a527-cdfd616c8103")
+CANONICAL_FACT_NAMESPACE = uuid.UUID("b2e6a5de-31b7-4f44-9a42-05acb6c06c62")
 
 
 SCHEMA_SQL = """
@@ -30,7 +31,8 @@ CREATE TABLE facts (
     id UUID PRIMARY KEY,
     subject_id UUID NOT NULL REFERENCES entities(id),
     predicate TEXT NOT NULL,
-    object_id UUID NOT NULL REFERENCES entities(id)
+    object_id UUID NOT NULL REFERENCES entities(id),
+    UNIQUE (subject_id, predicate, object_id)
 );
 
 CREATE TABLE mentions (
@@ -99,6 +101,7 @@ class MinimalGraphExporter:
         facts, unresolved = self._prepare_facts(mention_to_entity)
         self._copy_unresolved_entities(unresolved)
         self._copy_facts_and_mentions(facts)
+        mention_count = sum(len(chunk_ids) for *_, chunk_ids in facts)
         summary = ExportSummary(
             chunks=chunk_count,
             canonical_entities=canonical_count,
@@ -106,7 +109,7 @@ class MinimalGraphExporter:
             unresolved_entities=len(unresolved),
             entities=canonical_count + standalone_count + len(unresolved),
             facts=len(facts),
-            mentions=len(facts),
+            mentions=mention_count,
         )
         self._validate(summary)
         return summary
@@ -163,9 +166,12 @@ class MinimalGraphExporter:
     def _prepare_facts(self, mention_to_entity):
         with self.source.cursor() as cursor:
             cursor.execute(
-                """SELECT r.relation_mention_id,r.node_id,r.subject_text,r.predicate,r.object_text,
+                """SELECT r.relation_mention_id,r.node_id,r.subject_text,
+                          COALESCE(cp.canonical_name, r.predicate),r.object_text,
                           sl.entity_mention_id,ol.entity_mention_id
                    FROM relation_mentions r
+                   LEFT JOIN canonical_predicates cp
+                        ON cp.canonical_predicate_id=r.canonical_predicate_id
                    LEFT JOIN relation_entity_links sl ON sl.relation_mention_id=r.relation_mention_id
                         AND sl.endpoint_role='subject'
                    LEFT JOIN relation_entity_links ol ON ol.relation_mention_id=r.relation_mention_id
@@ -173,7 +179,7 @@ class MinimalGraphExporter:
                    ORDER BY r.relation_mention_id"""
             )
             rows = cursor.fetchall()
-        facts = []
+        fact_chunks: dict[tuple[uuid.UUID, str, uuid.UUID], set[str]] = {}
         unresolved = {}
         for relation_id, node_id, subject_text, predicate, object_text, subject_mention, object_mention in rows:
             if subject_mention is None:
@@ -186,7 +192,17 @@ class MinimalGraphExporter:
                 unresolved[object_id] = object_text
             else:
                 object_id = mention_to_entity[object_mention]
-            facts.append((relation_id, subject_id, predicate, object_id, node_id))
+            key = (subject_id, predicate, object_id)
+            fact_chunks.setdefault(key, set()).add(node_id)
+        facts = []
+        for (subject_id, predicate, object_id), chunk_ids in sorted(
+            fact_chunks.items(), key=lambda item: tuple(str(value) for value in item[0])
+        ):
+            fact_id = uuid.uuid5(
+                CANONICAL_FACT_NAMESPACE,
+                f"{subject_id}\x1f{predicate}\x1f{object_id}",
+            )
+            facts.append((fact_id, subject_id, predicate, object_id, sorted(chunk_ids)))
         return facts, unresolved
 
     def _copy_unresolved_entities(self, unresolved):
@@ -200,13 +216,14 @@ class MinimalGraphExporter:
         with self.target.cursor() as cursor, cursor.copy(
             "COPY facts(id,subject_id,predicate,object_id) FROM STDIN"
         ) as copy:
-            for relation_id, subject_id, predicate, object_id, _ in facts:
-                copy.write_row((relation_id, subject_id, predicate, object_id))
+            for fact_id, subject_id, predicate, object_id, _ in facts:
+                copy.write_row((fact_id, subject_id, predicate, object_id))
         with self.target.cursor() as cursor, cursor.copy(
             "COPY mentions(fact_id,chunk_id) FROM STDIN"
         ) as copy:
-            for relation_id, _, _, _, node_id in facts:
-                copy.write_row((relation_id, node_id))
+            for fact_id, _, _, _, chunk_ids in facts:
+                for chunk_id in chunk_ids:
+                    copy.write_row((fact_id, chunk_id))
 
     def _validate(self, summary: ExportSummary):
         with self.target.cursor() as cursor:

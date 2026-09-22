@@ -10,7 +10,10 @@ from methods.datasets import load_samples
 from methods.hipporag.ppr import run_personalized_pagerank, transition_matrix
 from methods.hipporag.recognition import _clean_triples, render_fact_query
 from methods.hipporag.method import HippoRAG2Config, HippoRAG2Method
+from methods.registry import available_methods
 from methods.telemetry import StageRecorder
+from methods.vanilla_rag.method import VanillaRAGConfig
+from kg_pipeline.reranking import OpenAICompatibleReranker, RerankerConfig
 from scripts.run_method import stage_output_for_display
 
 
@@ -77,6 +80,29 @@ class TelemetryTests(unittest.TestCase):
         output, metadata = stage_output_for_display("passage_retrieval", list(range(200)))
         self.assertEqual(output, list(range(10)))
         self.assertEqual(metadata, {"showing": 10, "total": 200, "truncated": True})
+
+
+class VanillaRAGTests(unittest.TestCase):
+    def test_method_is_registered_and_defaults_are_bounded(self):
+        self.assertIn("vanilla_rag", available_methods())
+        config = VanillaRAGConfig()
+        self.assertEqual(config.retrieval_top_k, 50)
+        self.assertEqual(config.rerank_top_k, 10)
+        self.assertEqual(config.qa_top_k, 5)
+
+    def test_reranker_parses_and_validates_ranked_results(self):
+        reranker = OpenAICompatibleReranker(RerankerConfig(
+            base_url="http://reranker.invalid/v1",
+            api_key="test",
+            model="test-reranker",
+        ))
+        reranker._post = lambda payload: {"results": [
+            {"index": 1, "relevance_score": 0.91},
+            {"index": 0, "relevance_score": 0.42},
+        ]}
+        hits = reranker.rerank("query", ["first", "second"], top_n=2)
+        self.assertEqual([hit.index for hit in hits], [1, 0])
+        self.assertEqual([hit.score for hit in hits], [0.91, 0.42])
 
 
 class FactRecognitionTests(unittest.TestCase):

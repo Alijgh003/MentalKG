@@ -63,16 +63,18 @@ class FactRecognizer:
             import dspy
 
             class GeneratePsychiatricFactQueries(dspy.Signature):
-                """Generate fact-shaped search queries for evidence retrieval.
+                """Extract meaningful knowledge-graph facts from the entire post.
 
-                Base every query on an observation explicitly stated in the post.
-                Preserve its meaning and context; do not turn an ordinary circumstance
-                into a symptom or assume a diagnosis, cause, severity, or duration that
-                the poster did not report. Form concise subject-predicate-object search
-                queries that can test whether the observed facts support, oppose, or
-                distinguish the condition asked about. If the post provides no useful
-                observation, query the target condition's discriminating evidence
-                directly. Do not invent patients, codes, criteria labels, or facts.
+                Return only concise subject-predicate-object triples. Use the main
+                semantic entity as subject; use `poster` only for an action, experience,
+                request, or belief explicitly attributed to the writer. Cover symptoms,
+                disorders, medications, treatments, effects, questions, and relations.
+                Preserve uncertainty and negation. Keep input placeholders such as
+                `[deleted]` in provenance, but do not treat them as semantic entities
+                or facts.
+                Do not infer diagnoses or relations not stated, and do not force every
+                allowed label into a triple. The appended label list is only the task
+                label set; it is not evidence.
                 """
 
                 post: str = dspy.InputField(desc="Psychiatric post, self-report, or question")

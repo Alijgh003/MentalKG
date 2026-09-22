@@ -23,6 +23,15 @@ Run a chosen sample count or the complete split:
 .venv/bin/python scripts/run_method.py --method hipporag2 --dataset SWMH --split test --all
 ```
 
+For a reproducible non-contiguous sample (for example, a stratified set), pass
+zero-based dataset row indices directly:
+
+```bash
+.venv/bin/python scripts/run_method.py \
+  --method vanilla_rag --dataset SWMH --split test \
+  --row-indices 23,38,87,134,148,167,245,257,308,511
+```
+
 Override method config without adding method-specific runner flags:
 
 ```bash
@@ -53,6 +62,29 @@ whose raw cosine similarity is at least `passage_similarity_threshold` (default
 `0.50`) can seed PPR. Their combined restart mass is capped at
 `passage_seed_mass_ratio` (default `0.10`) times the entity-seed mass, preventing
 a large dense candidate pool from overwhelming the graph-derived seeds.
+
+## Vanilla RAG baseline
+
+`vanilla_rag` embeds the full input, retrieves the 50 nearest chunks from
+Milvus, asks a reranking endpoint to retain the best 10, and sends the best 5
+to the same dataset-aware DSPy answer program used by HippoRAG:
+
+```bash
+.venv/bin/python scripts/run_method.py \
+  --method vanilla_rag --dataset DR --split test --limit 10 \
+  --stop-after answer_generation
+```
+
+The sizes are configurable with `VANILLA_RAG_RETRIEVAL_TOP_K`,
+`VANILLA_RAG_RERANK_TOP_K`, and `VANILLA_RAG_QA_TOP_K`. Reranker connection
+settings use `RERANK_BASE_URL`, `RERANK_API_KEY`, and `RERANK_MODEL`; when they
+are omitted, they inherit the existing embedding service settings.
+
+The currently configured local service advertises `/v1/rerank` and accepts the
+same `jina` model loaded for embeddings. In a smoke test its rerank scores and
+ordering were effectively identical to dense cosine retrieval, so it should
+not be treated as a distinct cross-encoder. To measure a real reranking gain,
+point the `RERANK_*` variables at a service running a dedicated reranker model.
 
 ## Inspect one pipeline boundary
 
@@ -92,6 +124,25 @@ Generated run artifacts are written under `outputs/method_runs/` by default.
 They intentionally contain the immutable input and retrieved evidence required
 by `KG-Construction/evaluation_protocol.md`; do not publish restricted dataset
 artifacts.
+
+## Explanation evaluation
+
+The first explanation metric is an embedding-based semantic similarity score.
+The evaluator extracts the generated reasoning and the benchmark's reference
+reasoning, embeds both with the configured embedding service, and reports their
+cosine similarity per sample plus mean and median:
+
+```bash
+.venv/bin/python scripts/evaluate_explanations.py \
+  --run outputs/method_runs/vanilla_rag-SWMH-test-stratified-10-final.jsonl \
+  --dataset SWMH --split test \
+  --output outputs/method_runs/vanilla_rag-SWMH-explanation-score.json
+```
+
+The result is named `bert_score_cosine` for experiment tracking, but is a
+whole-explanation BERTScore-style proxy, not the original token-level BERTScore
+implementation. The reference field is detected from `response` or
+`gpt-3.5-turbo`; use `--reference-field` to override it.
 
 Each run produces three synchronized files:
 
