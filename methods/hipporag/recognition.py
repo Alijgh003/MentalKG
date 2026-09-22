@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 import json
+import re
 from typing import Any
 
 from methods.dspy_runtime import build_lm, token_usage
@@ -26,6 +27,52 @@ def render_fact_query(triple: dict[str, str]) -> str:
         for value in (triple.get("subject", ""), triple.get("predicate", ""), triple.get("object", ""))
         if value and value.strip()
     )
+
+
+_GENERIC_LABELS = {"yes", "no", "true", "false", "y", "n", "positive", "negative"}
+
+
+def _is_nonsemantic_label(label: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", " ", label.casefold()).strip()
+    if normalized in _GENERIC_LABELS:
+        return True
+    # Negative/absence classes describe the absence of a target, not a semantic
+    # entity to search for (e.g. "no mental disorders").
+    return normalized.startswith(("no ", "without ", "none ")) or normalized in {"none", "no disorder", "no disorders"}
+
+
+def semantic_query_targets(question: str, labels: tuple[str, ...] = ()) -> list[str]:
+    """Return minimal semantic targets, never treating binary answer tokens as topics."""
+    targets = [label.strip() for label in labels if label.strip() and not _is_nonsemantic_label(label)]
+    if targets:
+        return list(dict.fromkeys(targets))
+    # Binary datasets often put the actual target in the question (e.g. "suffers
+    # from depression?"). Keep this deliberately generic and dataset-agnostic.
+    patterns = (
+        r"(?:suffers?|suffering|diagnosed|diagnosis|symptoms?|about|related to)\s+(?:from\s+|of\s+)?([a-z][a-z0-9 _/-]{2,60}?)(?:\?|\.|\)|$)",
+        r"(?:does|is|has)\s+(?:the poster\s+)?(?:have|suffer from|show)\s+([a-z][a-z0-9 _/-]{2,60}?)(?:\?|\.|$)",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, question, flags=re.IGNORECASE)
+        if match:
+            candidate = re.sub(r"\s+", " ", match.group(1)).strip(" \"'")
+            if not _is_nonsemantic_label(candidate) and candidate:
+                return [candidate]
+    return []
+
+
+def build_label_fact_queries(targets: list[str]) -> list[dict[str, str]]:
+    """Build one retrieval-only fact query per semantic target."""
+    return [
+        {
+            "subject": target,
+            "predicate": "has symptoms or relevant evidence",
+            "object": "mental health condition",
+            "query_type": "label_target",
+            "target_label": target,
+        }
+        for target in dict.fromkeys(targets)
+    ]
 
 
 def _clean_triples(values: Any, *, limit: int) -> list[dict[str, str]]:
@@ -72,9 +119,10 @@ class FactRecognizer:
                 Preserve uncertainty and negation. Keep input placeholders such as
                 `[deleted]` in provenance, but do not treat them as semantic entities
                 or facts.
-                Do not infer diagnoses or relations not stated, and do not force every
-                allowed label into a triple. The appended label list is only the task
-                label set; it is not evidence.
+                Do not infer diagnoses or relations not stated. For each semantic
+                target supplied below, produce at most one useful triple that searches
+                for evidence relevant to that target. Binary answer tokens such as
+                yes/no are not semantic targets and must never become entities.
                 """
 
                 post: str = dspy.InputField(desc="Psychiatric post, self-report, or question")

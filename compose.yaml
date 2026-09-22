@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-dsm5}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+      - "0.0.0.0:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - dsm5_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -29,8 +29,8 @@ services:
       COMMON_STORAGETYPE: local
       DEPLOY_MODE: STANDALONE
     ports:
-      - "127.0.0.1:${MILVUS_PORT:-19530}:19530"
-      - "127.0.0.1:${MILVUS_WEB_PORT:-9091}:9091"
+      - "0.0.0.0:${MILVUS_PORT:-19530}:19530"
+      - "0.0.0.0:${MILVUS_WEB_PORT:-9091}:9091"
     volumes:
       - milvus_data:/var/lib/milvus
       - ./milvus/embedEtcd.yaml:/milvus/configs/embedEtcd.yaml:ro

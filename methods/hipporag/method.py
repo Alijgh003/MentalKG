@@ -19,7 +19,10 @@ from methods.telemetry import StageRecorder
 
 from .graph import GraphProjection, load_graph_projection
 from .ppr import run_personalized_pagerank
-from .recognition import FactRecognizer, FactRelevanceFilter, render_fact_query
+from .recognition import (
+    FactRecognizer, FactRelevanceFilter, build_label_fact_queries,
+    render_fact_query, semantic_query_targets,
+)
 from .answering import EvidenceAnswerer
 
 
@@ -47,7 +50,8 @@ class HippoRAG2Config(BaseSettings):
 
     fact_retrieval_top_k_per_query: int = Field(default=15, gt=0)
     fact_filter_candidate_limit: int = Field(default=20, gt=0)
-    final_fact_top_k: int = Field(default=10, gt=0)
+    final_fact_top_k: int = Field(default=12, gt=0)
+    fact_group_top_k: int = Field(default=6, gt=0)
     linking_top_k: int | None = Field(default=None, gt=0)
     fact_query_limit: int = Field(default=5, gt=0)
     passage_seed_top_k: int = Field(default=200, gt=0)
@@ -63,6 +67,7 @@ class HippoRAG2Config(BaseSettings):
 
 class HippoRAG2Method:
     name = "hipporag2"
+    use_fact_idf_chunks = False
 
     def __init__(
         self, *, generate_answer: bool = False, config_overrides: dict | None = None,
@@ -251,13 +256,19 @@ class HippoRAG2Method:
             # Normalize only the globally filtered pool, then enforce the final
             # graph-seed limit even if a provider returned too many IDs.
             self._normalize_hit_scores(candidates)
-            retained = candidates[: self.config.final_fact_top_k]
+            retained = self._diverse_fact_retention(
+                candidates, self.config.final_fact_top_k, self.config.fact_group_top_k,
+            )
             event["details"].update({
                 "unique_hits_before_filter": len(broad_candidates),
                 "presented_to_filter": min(
                     len(broad_candidates), self.config.fact_filter_candidate_limit
                 ),
                 "retained_hits": len(retained),
+                "retained_query_types": sorted({
+                    str(match.get("query", {}).get("query_type", "model_generated"))
+                    for row in retained for match in row.get("matched_queries", [])
+                }),
                 "total_hits_before_deduplication": total_raw_hits,
                 "normalization_raw_min": min((row["raw_score"] for row in candidates), default=None),
                 "normalization_raw_max": max((row["raw_score"] for row in candidates), default=None),
@@ -286,6 +297,45 @@ class HippoRAG2Method:
             if len(selected) >= limit:
                 break
         return selected
+
+    @staticmethod
+    def _diverse_fact_retention(candidates: list[dict], limit: int, group_limit: int) -> list[dict]:
+        """Keep up to group_limit facts per source before filling remaining slots."""
+        if len(candidates) <= limit:
+            return candidates
+        groups: dict[str, list[dict]] = defaultdict(list)
+        for row in candidates:
+            kinds = {
+                str(match.get("query", {}).get("query_type", "model_generated"))
+                for match in row.get("matched_queries", [])
+            }
+            group = "label_target" if "label_target" in kinds else "model_generated"
+            groups[group].append(row)
+        retained: list[dict] = []
+        retained_ids: set[str] = set()
+        retained_counts: dict[str, int] = defaultdict(int)
+        for group in ("model_generated", "label_target"):
+            for row in groups.get(group, [])[:group_limit]:
+                if len(retained) >= limit:
+                    break
+                retained.append(row)
+                retained_ids.add(row["id"])
+                retained_counts[group] += 1
+        for row in candidates:
+            if len(retained) >= limit:
+                break
+            if row["id"] not in retained_ids:
+                kinds = {
+                    str(match.get("query", {}).get("query_type", "model_generated"))
+                    for match in row.get("matched_queries", [])
+                }
+                group = "label_target" if "label_target" in kinds else "model_generated"
+                if retained_counts[group] >= group_limit:
+                    continue
+                retained.append(row)
+                retained_ids.add(row["id"])
+                retained_counts[group] += 1
+        return retained
 
     def _passage_candidates(self, query: str, recorder: StageRecorder) -> list[dict]:
         hits = self._search(
@@ -319,6 +369,52 @@ class HippoRAG2Method:
             )
             return {row[0]: (row[1], row[2], row[3]) for row in cursor}
 
+    def _fact_idf_passages(self, facts: list[dict], endpoints: dict[str, tuple[str, str, str]]) -> list[dict]:
+        """Project retrieved facts to chunks and weight rare fact endpoints more."""
+        if not facts:
+            return []
+        fact_ids = [fact["id"] for fact in facts]
+        with self.connection.cursor() as cursor:
+            cursor.execute("SELECT count(*) FROM chunks")
+            chunk_count = max(int(cursor.fetchone()[0]), 1)
+            cursor.execute(
+                "SELECT m.fact_id::text, m.chunk_id::text, f.subject_id::text, f.object_id::text "
+                "FROM mentions m JOIN facts f ON f.id=m.fact_id WHERE m.fact_id = ANY(%s::uuid[])",
+                (fact_ids,),
+            )
+            links = list(cursor)
+            entity_ids = sorted({entity for _, _, subject, object_ in links for entity in (subject, object_)})
+            if entity_ids:
+                cursor.execute(
+                    "SELECT e.entity_id::text, count(DISTINCT m.chunk_id) "
+                    "FROM facts f JOIN mentions m ON m.fact_id=f.id "
+                    "CROSS JOIN LATERAL (VALUES (f.subject_id), (f.object_id)) e(entity_id) "
+                    "WHERE e.entity_id = ANY(%s::uuid[]) GROUP BY e.entity_id",
+                    (entity_ids,),
+                )
+                df = {row[0]: int(row[1]) for row in cursor}
+            else:
+                df = {}
+        idf = {entity: float(np.log((chunk_count + 1) / (df.get(entity, 0) + 1)) + 1.0) for entity in entity_ids}
+        fact_score = {fact["id"]: max(float(fact.get("score", 0.0)), 0.0) for fact in facts}
+        chunk_scores: dict[str, float] = defaultdict(float)
+        chunk_facts: dict[str, list[str]] = defaultdict(list)
+        for fact_id, chunk_id, subject, object_ in links:
+            endpoint_weight = idf.get(subject, 1.0) + idf.get(object_, 1.0)
+            chunk_scores[chunk_id] += fact_score.get(fact_id, 0.0) * endpoint_weight
+            chunk_facts[chunk_id].append(fact_id)
+        max_score = max(chunk_scores.values(), default=0.0)
+        rows = []
+        for chunk_id, score in chunk_scores.items():
+            rows.append({
+                "id": chunk_id,
+                "score": float(score / max_score) if max_score > 0 else 0.0,
+                "raw_score": float(score),
+                "fact_ids": list(dict.fromkeys(chunk_facts[chunk_id])),
+            })
+        rows.sort(key=lambda row: row["raw_score"], reverse=True)
+        return self._hydrate_passages(rows[: self.config.retrieval_top_k])
+
     def run(self, sample: BenchmarkSample) -> MethodResult:
         started = time.perf_counter()
         recorder = StageRecorder(
@@ -339,19 +435,29 @@ class HippoRAG2Method:
 
         with recorder.stage("fact_generation", mode=self.config.recognition_mode) as event:
             event["llm_calls"] = 1 if self.config.recognition_mode == "llm" else 0
+            targets = semantic_query_targets(sample.text, sample.valid_labels)
             generation = self.recognizer.generate(labeled_query)
             event["input_tokens"] = generation.input_tokens
             event["output_tokens"] = generation.output_tokens
             event["details"]["generated_triples"] = len(generation.triples)
+            event["details"]["semantic_targets"] = targets
         generated_queries = [
-            {"query_id": f"fq{rank}", **triple, "text": render_fact_query(triple)}
+            {"query_id": f"fq{rank}", "query_type": "model_generated", **triple, "text": render_fact_query(triple)}
             for rank, triple in enumerate(generation.triples, start=1)
         ]
+        label_queries = [
+            {"query_id": f"lq{rank}", **triple, "text": render_fact_query(triple)}
+            for rank, triple in enumerate(build_label_fact_queries(targets), start=1)
+        ]
+        retrieval_queries = generated_queries + label_queries
         stage_outputs["fact_generation"] = generated_queries
+        stage_outputs["label_fact_queries"] = label_queries
         recognition_metadata = {
             "mode": self.config.recognition_mode,
             "generated_fact_queries": generated_queries,
+            "label_fact_queries": label_queries,
             "raw_prediction": generation.raw_response,
+            "semantic_targets": targets,
         }
         if self.stop_after == "fact_generation":
             return self._result(
@@ -360,7 +466,7 @@ class HippoRAG2Method:
                 method_metadata={"recognition": recognition_metadata},
             )
 
-        fact_candidates = self._fact_candidates(generation.triples, labeled_query, recorder)
+        fact_candidates = self._fact_candidates(retrieval_queries, labeled_query, recorder)
         stage_outputs["fact_filtering"] = self._last_filter_usage["queries"]
         with recorder.stage("fact_endpoint_lookup", facts=len(fact_candidates)):
             endpoints = self._load_fact_endpoints([fact["id"] for fact in fact_candidates])
@@ -374,6 +480,25 @@ class HippoRAG2Method:
                 stopping_reason="stopped_after_fact_retrieval",
                 method_metadata={"recognition": recognition_metadata},
             )
+
+        if self.use_fact_idf_chunks:
+            with recorder.stage("fact_idf_chunk_ranking", facts=len(fact_candidates)) as event:
+                ranked_passages = self._fact_idf_passages(fact_candidates, endpoints)
+                event["details"].update({
+                    "chunks": len(ranked_passages),
+                    "top_k": self.config.retrieval_top_k,
+                    "scoring": "sum(fact_score * (idf(subject) + idf(object)))",
+                })
+            ranked_trace = self._passage_trace(ranked_passages)
+            stage_outputs["passage_ranking"] = ranked_trace
+            result = self._result(
+                recorder, stage_outputs, generation,
+                triples=retrieved_facts,
+                passages=ranked_trace,
+                stopping_reason="fact_idf_complete",
+                method_metadata={"recognition": recognition_metadata, "chunk_scoring": "fact_idf"},
+            )
+            return self._maybe_answer(sample, result, recorder)
 
         passage_candidates = self._passage_candidates(labeled_query, recorder)
         passage_candidates = [
@@ -573,6 +698,7 @@ class HippoRAG2Method:
         )
         return self._maybe_answer(sample, result, recorder)
 
+
     def _maybe_answer(self, sample: BenchmarkSample, result: MethodResult, recorder: StageRecorder) -> MethodResult:
         if not self.generate_answer:
             return result
@@ -672,3 +798,10 @@ class HippoRAG2Method:
         for passage in passages:
             passage["text"] = contents.get(passage["id"], "")
         return passages
+
+
+class FactIDFRAGMethod(HippoRAG2Method):
+    """HippoRAG fact retrieval followed by IDF-weighted fact-to-chunk ranking."""
+
+    name = "fact_idf_rag"
+    use_fact_idf_chunks = True

@@ -1,5 +1,5 @@
 """HippoRAG 2-style retrieval adapted to the project's canonical DSM graph."""
 
-from .method import HippoRAG2Method
+from .method import FactIDFRAGMethod, HippoRAG2Method
 
-__all__ = ["HippoRAG2Method"]
+__all__ = ["FactIDFRAGMethod", "HippoRAG2Method"]

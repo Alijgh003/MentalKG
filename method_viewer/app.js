@@ -110,9 +110,14 @@ function renderGenerated(rows) {
 function renderFacts(rows, sample) {
   const metrics = (sample.cost?.stages || []).find(item => item.stage === "fact_retrieval")?.details || {};
   const info = `<div class="metric-strip">${stat("Merged pool", metrics.unique_hits_before_final_k ?? "—")}${stat("Raw range", metrics.normalization_raw_min == null ? "—" : `${fmt(metrics.normalization_raw_min)}–${fmt(metrics.normalization_raw_max)}`)}${stat("Kept", rows.length)}</div>`;
+  const queries = [
+    ...(sample.stage_outputs?.fact_generation || []),
+    ...(sample.stage_outputs?.label_fact_queries || []),
+  ];
+  const queryPanel = queries.length ? `<div class="query-panel"><span class="detail-label">Queries used for fact retrieval</span>${queries.map(query => `<div class="match"><b>${escapeHtml(query.query_id)}</b><span>${escapeHtml(query.text || `${query.subject} ${query.predicate} ${query.object}`)}</span>${query.query_type === "label_target" ? `<small>label target: ${escapeHtml(query.target_label || "")}</small>` : `<small>model-generated</small>`}</div>`).join("")}</div>` : "";
   if (!rows.length) return sectionIntro("No retrieved facts", "No query triples were generated, or no matching facts were returned.", "0 facts") + info + emptyBox();
   return sectionIntro("Facts retained for graph seeding", "Sorted after global min-max normalization of the deduplicated candidate pool. Open a row to see exactly which generated query matched it.", `${rows.length} facts`) + info +
-    `<div class="fact-list">${rows.map(renderFact).join("")}</div>`;
+    queryPanel + `<div class="fact-list">${rows.map(renderFact).join("")}</div>`;
 }
 
 function renderFact(row) {

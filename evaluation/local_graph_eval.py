@@ -13,6 +13,7 @@ from methods.dspy_runtime import build_lm, token_usage
 @dataclass(frozen=True)
 class Claim:
     claim_id: str
+    scope: str
     sentence: str
     subject: str
     predicate: str
@@ -22,7 +23,7 @@ class Claim:
         return self.__dict__.copy()
 
 
-def _claims(values: Any, prefix: str) -> list[Claim]:
+def _claims(values: Any, prefix: str, scope: str) -> list[Claim]:
     output: list[Claim] = []
     for index, value in enumerate(values or [], start=1):
         if not isinstance(value, dict):
@@ -32,7 +33,14 @@ def _claims(values: Any, prefix: str) -> list[Claim]:
         predicate = str(value.get("predicate", "")).strip()
         object_ = str(value.get("object", "")).strip()
         if sentence and subject and predicate and object_:
-            output.append(Claim(f"{prefix}{index}", sentence, subject, predicate, object_))
+            output.append(Claim(
+                f"{prefix}{scope.upper()}_{index}",
+                scope,
+                sentence,
+                subject,
+                predicate,
+                object_,
+            ))
     return output
 
 
@@ -59,23 +67,70 @@ class LocalGraphEvaluator:
         class ExtractClaims(dspy.Signature):
             """Convert an explanation into a small knowledge graph.
 
-            Extract the entities explicitly mentioned or needed by the reasoning,
-            then extract every factual/clinical relation between those entities,
-            including supporting facts used to reach the final diagnosis. Preserve
-            negation and uncertainty in the predicate. Do not add outside knowledge.
-            Every relation must have a faithful source sentence from the explanation.
+            Extract the relations explicitly stated in the explanation and divide
+            them into two separate scopes.
+
+            case_relations are claims about the person in the case, post, or
+            explanation: claims whose subject is the poster, patient, individual,
+            writer, or a pronoun referring to them. This includes what they report,
+            experience, suffer from, deny, or are being treated for.
+
+            clinical_relations are general clinical or evidence facts that do not
+            describe the case person: for example, a symptom being associated with
+            a disorder, a disorder being characterized by a symptom, or a treatment
+            being used for a disorder.
+
+            Every relation must be atomic and fine-grained. Split coordinated
+            lists, multiple symptoms, and multiple objects into separate triples.
+            For example, do not return one triple whose object is "not wanting to
+            grow up, not finding appeal in adult responsibilities, feeling
+            disconnected from society, and having a low will to live". Return four
+            separate triples, one for each fact. Each triple must have exactly one
+            entity-like subject, one concise predicate, and one entity-like object.
+            Do not put a list, conjunction, or full explanation sentence in subject
+            or object.
+
+            Resolve discourse references before extracting relations. Expressions
+            such as "these observations", "these symptoms", "this", "they", "it",
+            and "the above" must be linked to their explicitly stated antecedents
+            in the surrounding text. When a later sentence says that such an
+            expression aligns with, suggests, supports, or is consistent with a
+            clinical condition, expand that relation to every atomic antecedent.
+            For example, if the text says "The poster describes isolation and a
+            low will to live. These observations align with depressive disorders",
+            extract both:
+            "isolation -> aligns with -> depressive disorders" and
+            "low will to live -> aligns with -> depressive disorders".
+            Do not replace these antecedents with a generic phrase such as
+            "these observations", and do not omit the expanded relations.
+
+            Keep the scopes separate. If one sentence contains both kinds of facts,
+            extract separate relations into the appropriate lists. Preserve negation
+            and uncertainty in the predicate. Do not add outside knowledge. Every
+            relation must have a faithful source sentence from the explanation.
             """
 
             explanation: str = dspy.InputField()
-            entities: list[dict[str, str]] = dspy.OutputField(
-                desc="Unique objects with text and type fields; type is concept, symptom, disorder, behavior, risk, treatment, or context"
+            case_entities: list[dict[str, str]] = dspy.OutputField(
+                desc="Unique case/person objects with text and type fields"
             )
-            relations: list[dict[str, str]] = dspy.OutputField(
-                desc="Exhaustive factual graph edges with sentence, subject, predicate, and object fields"
+            clinical_entities: list[dict[str, str]] = dspy.OutputField(
+                desc="Unique clinical objects with text and type fields"
+            )
+            case_relations: list[dict[str, str]] = dspy.OutputField(
+                desc="Claims about the case person; each has sentence, subject, predicate, and object"
+            )
+            clinical_relations: list[dict[str, str]] = dspy.OutputField(
+                desc="General clinical/evidence claims; each has sentence, subject, predicate, and object"
             )
 
         class JudgeClaim(dspy.Signature):
-            """Judge whether a generated claim is supported by the gold claims."""
+            """Judge a generated claim against gold claims from the same scope.
+
+            Case claims describe the person in the case. Clinical claims describe
+            general clinical or evidence facts. Never match a case claim to a
+            clinical claim, or a clinical claim to a case claim.
+            """
 
             generated_claim: str = dspy.InputField()
             gold_claims: str = dspy.InputField()
@@ -89,13 +144,21 @@ class LocalGraphEvaluator:
         self.extractor = dspy.Predict(ExtractClaims)
         self.judge = dspy.Predict(JudgeClaim)
 
-    def extract(self, explanation: str, prefix: str) -> tuple[list[Claim], dict[str, int]]:
+    def extract(self, explanation: str, prefix: str) -> tuple[dict[str, list[dict[str, str]]], list[Claim], dict[str, int]]:
         import dspy
 
         with dspy.context(lm=self.lm):
             prediction = self.extractor(explanation=explanation)
         input_tokens, output_tokens = token_usage(self.lm)
-        return _entities(prediction.entities), _claims(prediction.relations, prefix), {
+        claims = (
+            _claims(prediction.case_relations, prefix, "case")
+            + _claims(prediction.clinical_relations, prefix, "clinical")
+        )
+        entities = {
+            "case": _entities(prediction.case_entities),
+            "clinical": _entities(prediction.clinical_entities),
+        }
+        return entities, claims, {
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
         }
@@ -133,9 +196,13 @@ def evaluate_records(evaluator: LocalGraphEvaluator, records: list[dict[str, Any
         total_input += usage["input_tokens"]; total_output += usage["output_tokens"]
         generated_entities, generated, usage = evaluator.extract(generated_text, "C")
         total_input += usage["input_tokens"]; total_output += usage["output_tokens"]
+        gold_by_scope = {
+            "case": [claim for claim in gold if claim.scope == "case"],
+            "clinical": [claim for claim in gold if claim.scope == "clinical"],
+        }
         judged = []
         for claim in generated:
-            item, usage = evaluator.evaluate_claim(claim, gold)
+            item, usage = evaluator.evaluate_claim(claim, gold_by_scope[claim.scope])
             total_input += usage["input_tokens"]; total_output += usage["output_tokens"]
             judged.append(item)
         supported = sum(item["status"] == "SUPPORTED" for item in judged)
@@ -162,6 +229,37 @@ def evaluate_records(evaluator: LocalGraphEvaluator, records: list[dict[str, Any
         def f1(precision: float, recall: float) -> float:
             return 2 * precision * recall / (precision + recall) if precision + recall else 0.0
 
+        by_scope = {}
+        for scope in ("case", "clinical"):
+            scoped_generated = [item for item in judged if item["claim"]["scope"] == scope]
+            scoped_gold = gold_by_scope[scope]
+            scoped_supported = sum(item["status"] == "SUPPORTED" for item in scoped_generated)
+            scoped_partial = sum(item["status"] == "PARTIALLY_SUPPORTED" for item in scoped_generated)
+            scoped_gold_ids = {claim.claim_id for claim in scoped_gold}
+            scoped_matched = {
+                gold_id
+                for item in scoped_generated
+                if item["status"] == "SUPPORTED"
+                for gold_id in item["matched_gold_claim_ids"]
+                if gold_id in scoped_gold_ids
+            }
+            scoped_precision = (
+                scoped_supported / len(scoped_generated) if scoped_generated else 0.0
+            )
+            scoped_recall = (
+                len(scoped_matched) / len(scoped_gold) if scoped_gold else 0.0
+            )
+            by_scope[scope] = {
+                "generated_claims": len(scoped_generated),
+                "gold_claims": len(scoped_gold),
+                "supported": scoped_supported,
+                "partially_supported": scoped_partial,
+                "strict_precision": scoped_precision,
+                "strict_recall": scoped_recall,
+                "strict_f1": f1(scoped_precision, scoped_recall),
+                "covered_gold_claim_ids": sorted(scoped_matched),
+            }
+
         aggregate["generated"] += generated_count
         aggregate["gold"] += gold_count
         aggregate["strict_supported"] += supported
@@ -186,6 +284,7 @@ def evaluate_records(evaluator: LocalGraphEvaluator, records: list[dict[str, Any
                 "soft_recall": soft_recall,
                 "soft_f1": f1(soft_precision, soft_recall),
                 "covered_gold_claim_ids": sorted(matched_strict),
+                "by_scope": by_scope,
             },
         })
     micro_precision = aggregate["strict_supported"] / aggregate["generated"] if aggregate["generated"] else 0.0

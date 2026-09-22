@@ -1,0 +1,128 @@
+{
+  "metric": "LocalGraphEval",
+  "samples": 2,
+  "results": [
+    {
+      "sample_id": "swmh-test-008ff411c1c550a2",
+      "gold_claims": [
+        {
+          "claim_id": "G1",
+          "sentence": "The post includes several symptoms commonly associated with depression, such as difficulty concentrating, feeling overwhelmed, memory problems, lack of motivation, and feelings of confusion and hopelessness.",
+          "subject": "difficulty concentrating, feeling overwhelmed, memory problems, lack of motivation, and feelings of confusion and hopelessness",
+          "predicate": "are commonly associated with",
+          "object": "depression"
+        },
+        {
+          "claim_id": "G2",
+          "sentence": "The individual also expresses distress and a sense of losing control over their mind.",
+          "subject": "the individual",
+          "predicate": "expresses",
+          "object": "distress and a sense of losing control over their mind"
+        }
+      ],
+      "generated_claims": [
+        {
+          "claim": {
+            "claim_id": "C1",
+            "sentence": "The poster describes severe cognitive difficulties, including an inability to focus, distractibility, memory loss (names, faces, bills), and confusion regarding their actions.",
+            "subject": "the poster",
+            "predicate": "describes",
+            "object": "severe cognitive difficulties including inability to focus, distractibility, memory loss, and confusion"
+          },
+          "status": "PARTIALLY_SUPPORTED",
+          "matched_gold_claim_ids": [
+            "G1"
+          ],
+          "reasoning": "The gold claims confirm difficulty concentrating, memory problems, and confusion, but they do not specifically mention distractibility or the specific types of memory loss (names, faces, bills) mentioned in the generated claim."
+        },
+        {
+          "claim": {
+            "claim_id": "C2",
+            "sentence": "These symptoms align with cognitive domains such as complex attention and memory described in P3 and P4.",
+            "subject": "the symptoms",
+            "predicate": "align with",
+            "object": "cognitive domains of complex attention and memory described in P3 and P4"
+          },
+          "status": "UNSUPPORTED",
+          "matched_gold_claim_ids": [],
+          "reasoning": "The gold claims mention symptoms like difficulty concentrating and memory problems, but they do not mention \"P3\", \"P4\", or specific \"cognitive domains\" as described in the generated claim."
+        },
+        {
+          "claim": {
+            "claim_id": "C3",
+            "sentence": "the provided valid labels (\"anxiety\", \"bipolar disorder\", \"depression\", \"no mental disorders\", \"suicide\") do not include any cognitive or neurocognitive disorders (such as Delirium or Major Neurocognitive Disorder).",
+            "subject": "the provided valid labels",
+            "predicate": "do not include",
+            "object": "cognitive or neurocognitive disorders such as Delirium or Major Neurocognitive Disorder"
+          },
+          "status": "UNSUPPORTED",
+          "matched_gold_claim_ids": [],
+          "reasoning": "The gold claims discuss symptoms of depression and individual distress, but they provide no information regarding the list of valid labels or the exclusion of cognitive disorders."
+        },
+        {
+          "claim": {
+            "claim_id": "C4",
+            "sentence": "the poster mentions feeling \"anxious,\"",
+            "subject": "the poster",
+            "predicate": "mentions feeling",
+            "object": "anxious"
+          },
+          "status": "UNSUPPORTED",
+          "matched_gold_claim_ids": [],
+          "reasoning": "The gold claims mention feelings of being overwhelmed, distress, and hopelessness, but they do not explicitly mention the word \"anxious\" or the feeling of anxiety."
+        }
+      ],
+      "summary": {
+        "generated_claims": 4,
+        "supported": 0,
+        "partially_supported": 1,
+        "contradicted": 0,
+        "unsupported": 3
+      }
+    },
+    {
+      "sample_id": "swmh-test-00e5a111e5a3ada2",
+      "gold_claims": [
+        {
+          "claim_id": "G1",
+          "sentence": "The post specifically asks for experiences of individuals who have taken beta blockers for anxiety, indicating that the individual is dealing with anxiety themselves.",
+          "subject": "the individual",
+          "predicate": "is dealing with",
+          "object": "anxiety"
+        },
+        {
+          "claim_id": "G2",
+          "sentence": "The mention of physical symptoms and the desire for relief from these symptoms also align with common symptoms of anxiety disorders.",
+          "subject": "physical symptoms and desire for relief",
+          "predicate": "align with",
+          "object": "common symptoms of anxiety disorders"
+        }
+      ],
+      "generated_claims": [
+        {
+          "claim": {
+            "claim_id": "C1",
+            "sentence": "the provided evidence (P2) specifies that pathological anxiety, such as Generalized Anxiety Disorder (GAD), requires excessive worry about multiple life aspects, an inability to control these fears, and specific physical or mental symptoms (e.g., fatigue, sleep disturbance) persisting for at least six months.",
+            "subject": "Generalized Anxiety Disorder (GAD)",
+            "predicate": "requires",
+            "object": "excessive worry about multiple life aspects, inability to control fears, and specific physical or mental symptoms persisting for at least six months"
+          },
+          "status": "UNSUPPORTED",
+          "matched_gold_claim_ids": [],
+          "reasoning": "The gold claims discuss a specific individual's experience with anxiety and beta blockers, but they do not provide the clinical diagnostic criteria for Generalized Anxiety Disorder (GAD) mentioned in the generated claim."
+        }
+      ],
+      "summary": {
+        "generated_claims": 1,
+        "supported": 0,
+        "partially_supported": 0,
+        "contradicted": 0,
+        "unsupported": 1
+      }
+    }
+  ],
+  "cost": {
+    "input_tokens": 4178,
+    "output_tokens": 1099
+  }
+}

@@ -121,7 +121,8 @@ class FactRecognitionTests(unittest.TestCase):
         config = HippoRAG2Config()
         self.assertEqual(config.fact_retrieval_top_k_per_query, 15)
         self.assertEqual(config.fact_filter_candidate_limit, 20)
-        self.assertEqual(config.final_fact_top_k, 10)
+        self.assertEqual(config.final_fact_top_k, 12)
+        self.assertEqual(config.fact_group_top_k, 6)
         self.assertEqual(config.passage_similarity_threshold, 0.50)
         self.assertEqual(config.passage_seed_mass_ratio, 0.10)
 

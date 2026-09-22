@@ -4,7 +4,7 @@ from typing import Any
 
 
 def available_methods() -> tuple[str, ...]:
-    return ("hipporag2", "vanilla_rag")
+    return ("hipporag2", "vanilla_rag", "fact_idf_rag")
 
 
 def create_method(name: str, **kwargs: Any):
@@ -17,4 +17,8 @@ def create_method(name: str, **kwargs: Any):
         from .vanilla_rag import VanillaRAGMethod
 
         return VanillaRAGMethod(**kwargs)
+    if normalized == "factidfrag":
+        from .hipporag import FactIDFRAGMethod
+
+        return FactIDFRAGMethod(**kwargs)
     raise ValueError(f"Unknown method {name!r}; available methods: {', '.join(available_methods())}")
