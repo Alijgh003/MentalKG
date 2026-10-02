@@ -9,6 +9,7 @@ const stageNames = {
   seed_weighting: "Entity seeds",
   ppr: "PPR nodes",
   passage_ranking: "Final chunks",
+  cot_generation: "CoT reasoning",
   answer_generation: "Final answer",
 };
 
@@ -93,6 +94,7 @@ function renderStage() {
   else if (state.stage === "ppr") content.innerHTML = renderPpr(data || {});
   else if (state.stage === "seed_weighting") content.innerHTML = renderSeeds(data || []);
   else if (state.stage === "reranking") content.innerHTML = renderReranked(data || []);
+  else if (state.stage === "cot_generation") content.innerHTML = renderCoT(data || {});
   else if (state.stage === "answer_generation") content.innerHTML = renderAnswer(data || {});
   else content.innerHTML = renderPassages(data || []);
 }
@@ -145,6 +147,12 @@ function renderPassages(rows) {
 
 function renderReranked(rows) {
   return sectionIntro("Reranked chunks", "Dense candidates reordered by the configured reranking endpoint.", `${rows.length} chunks`) + (rows.length ? `<div class="passage-list">${rows.map(row => `<article><div><b>#${row.rank}</b><code>${shortId(row.passage_id)}</code><strong>${fmt(row.rerank_score, 5)} rerank</strong></div><small>dense #${row.dense_rank} · ${fmt(row.dense_score, 5)}</small><p>${escapeHtml(row.text || "No hydrated text recorded at this stage.")}</p></article>`).join("")}</div>` : emptyBox());
+}
+
+function renderCoT(data) {
+  if (!data || !data.answer) return sectionIntro("CoT reasoning", "Chain-of-Thought without retrieval.", data.answer || "—") + emptyBox();
+  return sectionIntro("CoT reasoning", "LLM-only ChainOfThought: post + allowed labels → answer + reasoning.", data.answer) +
+    `<article class="triple-card"><span class="query-id">ANSWER</span><p><strong>${escapeHtml(data.answer)}</strong></p><span class="detail-label">Reasoning</span><p>${escapeHtml(data.reasoning || "No reasoning")}</p><span class="detail-label">Valid labels</span><p>${escapeHtml((data.valid_labels||[]).join(", "))}</p></article>`;
 }
 
 function renderAnswer(data) {

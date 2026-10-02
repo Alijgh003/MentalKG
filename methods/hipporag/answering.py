@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import secrets
 from dataclasses import dataclass
 
 from methods.dspy_runtime import build_lm, token_usage
@@ -56,6 +57,7 @@ class EvidenceAnswerer:
             )
 
         self.lm = build_lm()
+        self.retry_lm = None
         self.program = dspy.ChainOfThought(
             AnswerFromPsychiatricEvidence,
             rationale_field=dspy.OutputField(
@@ -117,11 +119,10 @@ class EvidenceAnswerer:
                     evidence=evidence,
                     valid_labels=list(valid_labels),
                 )
-            citations = tuple(
-                id_map[str(value)]
-                for value in prediction.cited_passage_ids
-                if str(value) in id_map
-            )
+            raw_citations = getattr(prediction, "cited_passage_ids", [])
+            if not isinstance(raw_citations, list):
+                raw_citations = []
+            citations = tuple(id_map[str(value)] for value in raw_citations if str(value) in id_map)
             input_tokens, output_tokens = token_usage(self.lm)
             raw_answer = str(prediction.answer).strip().rstrip(".")
             answer = normalized_labels.get(raw_answer.casefold(), raw_answer)
@@ -138,5 +139,46 @@ class EvidenceAnswerer:
                 errors=errors,
             )
         except Exception as error:
-            logger.exception("Answer generation failed")
-            return AnswerResult(errors=(f"answer_generation_error: {error}",))
+            logger.warning("Answer generation parse failed; retrying with a fresh LM: %s", error)
+            try:
+                # A fresh client plus a unique nonce prevents reuse of the failed
+                # cached completion. The retry is deliberately less deterministic.
+                if self.retry_lm is None:
+                    self.retry_lm = build_lm(temperature=0.2)
+                retry_question = (
+                    f"{labeled_question}\n\n"
+                    f"Retry request nonce: {secrets.token_hex(8)}. "
+                    "Return valid JSON fields: answer (one allowed label), "
+                    "cited_passage_ids (JSON list of strings), and concise reasoning."
+                )
+                with dspy.context(lm=self.retry_lm):
+                    prediction = self.program(
+                        question=retry_question,
+                        evidence=evidence,
+                        valid_labels=list(valid_labels),
+                    )
+                raw_answer = str(prediction.answer).strip().rstrip(".")
+                answer = normalized_labels.get(raw_answer.casefold(), raw_answer)
+                raw_citations = getattr(prediction, "cited_passage_ids", [])
+                if not isinstance(raw_citations, list):
+                    raw_citations = []
+                citations = tuple(id_map[str(value)] for value in raw_citations if str(value) in id_map)
+                retry_errors = () if answer in valid_labels else (
+                    f"answer_label_not_allowed: {raw_answer!r}; expected one of {list(valid_labels)!r}",
+                )
+                input_tokens, output_tokens = token_usage(self.retry_lm)
+                return AnswerResult(
+                    answer=answer,
+                    explanation=str(getattr(prediction, "reasoning", "")).strip(),
+                    cited_passage_ids=citations,
+                    raw_response=repr(prediction),
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    errors=retry_errors,
+                )
+            except Exception as retry_error:
+                logger.exception("Answer generation retry failed")
+                return AnswerResult(errors=(
+                    f"answer_generation_error: {error}",
+                    f"answer_generation_retry_error: {retry_error}",
+                ))

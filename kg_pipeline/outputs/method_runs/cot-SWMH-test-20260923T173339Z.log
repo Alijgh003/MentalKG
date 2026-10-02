@@ -1,0 +1,10 @@
+2026-09-23 21:03:39,036 INFO root: run_start run_id=b4863451-9c05-4430-811b-141ec49f4634 method=cot dataset=SWMH split=test samples=1 output=outputs/method_runs/cot-SWMH-test-20260923T173339Z.jsonl
+2026-09-23 21:03:39,967 INFO root: sample_start run_id=b4863451-9c05-4430-811b-141ec49f4634 dataset=SWMH split=test dataset_row=0 source_row=8143 sample_id=swmh-test-0003e0985d14ca64
+2026-09-23 21:03:47,912 INFO LiteLLM: 
+LiteLLM completion() model= google/gemma-3-4b-it; provider = openrouter
+2026-09-23 21:03:55,063 INFO LiteLLM: Wrapper: Completed Call, calling success_handler
+2026-09-23 21:03:55,070 INFO LiteLLM: 
+LiteLLM completion() model= google/gemma-3-4b-it; provider = openrouter
+2026-09-23 21:04:01,513 INFO LiteLLM: Wrapper: Completed Call, calling success_handler
+2026-09-23 21:04:01,518 INFO methods.telemetry: stage=cot_generation status=ok latency_ms=21550.337 llm_calls=1 tokens_in=573 tokens_out=132 context={'method': 'cot', 'dataset': 'SWMH', 'split': 'test', 'dataset_row_index': 0, 'source_row_index': '8143', 'sample_id': 'swmh-test-0003e0985d14ca64'}
+2026-09-23 21:04:01,518 INFO root: sample_end run_id=b4863451-9c05-4430-811b-141ec49f4634 sample_id=swmh-test-0003e0985d14ca64 status=cot_complete latency_ms=21550 tokens_in=573 tokens_out=132

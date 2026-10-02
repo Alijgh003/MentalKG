@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     llm_api_key: str = "not-needed"
     llm_timeout: int = 30
     llm_retry_attempts: int = 5
+    # Optional OpenRouter provider routing (e.g. deepseek via baidu/fp8)
+    # Comma-separated list, e.g. "baidu/fp8". If None, no provider field is sent.
+    llm_provider_only: str | None = None
+    llm_provider_allow_fallbacks: bool | None = None
 
     # Only when use RateLimitedLM in data_ingestion.core.llm
     llm_max_concurrent: int = 50

@@ -85,7 +85,9 @@ def _clean_triples(values: Any, *, limit: int) -> list[dict[str, str]]:
             continue
         triple = {key: str(value.get(key) or "").strip() for key in ("subject", "predicate", "object")}
         identity = tuple(triple.values())
-        if not all(identity) or identity in seen:
+        # Retrieval queries may intentionally stop at subject + relation; an
+        # object is useful but not required and must not be hallucinated.
+        if not triple["subject"] or not triple["predicate"] or identity in seen:
             continue
         seen.add(identity)
         cleaned.append(triple)
@@ -110,25 +112,28 @@ class FactRecognizer:
             import dspy
 
             class GeneratePsychiatricFactQueries(dspy.Signature):
-                """Extract meaningful knowledge-graph facts from the entire post.
+                """Generate minimal semantic search queries, not claims about the poster.
 
-                Return only concise subject-predicate-object triples. Use the main
-                semantic entity as subject; use `poster` only for an action, experience,
-                request, or belief explicitly attributed to the writer. Cover symptoms,
-                disorders, medications, treatments, effects, questions, and relations.
-                Preserve uncertainty and negation. Keep input placeholders such as
-                `[deleted]` in provenance, but do not treat them as semantic entities
-                or facts.
-                Do not infer diagnoses or relations not stated. For each semantic
-                target supplied below, produce at most one useful triple that searches
-                for evidence relevant to that target. Binary answer tokens such as
-                yes/no are not semantic targets and must never become entities.
+                Read the whole post and return exactly concise subject-relation queries
+                that can be embedded and searched against a knowledge graph. An object
+                may be included only when explicitly useful; subject and relation are
+                sufficient. The subject and optional object must be semantic concepts, never
+                `poster`, `patient`, or a first-person observation. Use query predicates
+                such as `is a symptom of`, `is associated with`, `is related to`,
+                `can co-occur with`, or `may indicate`. For example:
+                `loss of control | is associated with` and
+                `memory impairment | is a symptom of`.
+                Do not output `poster experiences X`, `poster reports X`, or other
+                observation triples. Preserve the meaning of the post, but phrase each
+                result as a retrieval query that can find explanatory clinical facts.
+                Do not diagnose, invent entities, or force a label into a query.
+                Binary answer tokens such as yes/no are not semantic entities.
                 """
 
                 post: str = dspy.InputField(desc="Psychiatric post, self-report, or question")
                 max_triples: int = dspy.InputField(desc="Maximum number of triples to return")
                 triples: list[dict[str, str]] = dspy.OutputField(
-                    desc="Objects with exactly subject, predicate, and object string fields"
+                    desc="Objects with subject and predicate; object is optional"
                 )
 
             self.lm = build_lm()
@@ -137,9 +142,9 @@ class FactRecognizer:
     def generate(self, post: str) -> FactQueryGenerationResult:
         if self.mode == "embedding":
             return FactQueryGenerationResult(triples=[{
-                "subject": "patient self-report",
-                "predicate": "is clinically related to",
-                "object": post.strip(),
+                "subject": "mental health symptoms",
+                "predicate": "are described by",
+                "object": "the reported experiences",
             }])
 
         import dspy

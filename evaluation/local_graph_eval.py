@@ -90,6 +90,19 @@ class LocalGraphEvaluator:
             Do not put a list, conjunction, or full explanation sentence in subject
             or object.
 
+            For a general, potentially ambiguous entity (especially a common
+            emotion, behavior, experience, or colloquial phrase), append a
+            brief parenthetical semantic gloss of two or three words to the
+            entity text in the extracted relation, while preserving the
+            original phrase. Use the form ``envy (wanting others' advantages)``
+            or ``resentment (hidden lasting anger)``. Do this only when the
+            gloss disambiguates the concept for semantic retrieval; do not add
+            glosses to explicit disorder names, established clinical terms,
+            named people, or entities whose meaning is already specific. Keep
+            the gloss faithful to the explanation and do not introduce outside
+            diagnoses or unsupported facts. Apply the same enriched text in
+            the corresponding entity list.
+
             Resolve discourse references before extracting relations. Expressions
             such as "these observations", "these symptoms", "this", "they", "it",
             and "the above" must be linked to their explicitly stated antecedents

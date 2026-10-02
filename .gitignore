@@ -4,4 +4,5 @@ __pycache__/
 *.py[cod]
 .env
 /datasets/
-/outputs/method_runs/
+# Generated experiment artifacts are local and should not be versioned.
+/outputs/

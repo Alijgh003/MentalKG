@@ -52,6 +52,7 @@ class HippoRAG2Config(BaseSettings):
     fact_filter_candidate_limit: int = Field(default=20, gt=0)
     final_fact_top_k: int = Field(default=12, gt=0)
     fact_group_top_k: int = Field(default=6, gt=0)
+    label_seed_weight: float = Field(default=0.2, ge=0, le=1)
     linking_top_k: int | None = Field(default=None, gt=0)
     fact_query_limit: int = Field(default=5, gt=0)
     passage_seed_top_k: int = Field(default=200, gt=0)
@@ -63,6 +64,7 @@ class HippoRAG2Config(BaseSettings):
     ppr_tolerance: float = Field(default=1e-10, gt=0)
     ppr_max_iterations: int = Field(default=200, gt=0)
     recognition_mode: str = "llm"
+    use_label_fact_queries: bool = True
 
 
 class HippoRAG2Method:
@@ -448,7 +450,7 @@ class HippoRAG2Method:
         label_queries = [
             {"query_id": f"lq{rank}", **triple, "text": render_fact_query(triple)}
             for rank, triple in enumerate(build_label_fact_queries(targets), start=1)
-        ]
+        ] if self.config.use_label_fact_queries else []
         retrieval_queries = generated_queries + label_queries
         stage_outputs["fact_generation"] = generated_queries
         stage_outputs["label_fact_queries"] = label_queries
@@ -523,14 +525,24 @@ class HippoRAG2Method:
                 endpoint = endpoints.get(fact["id"])
                 if endpoint is None:
                     continue
+                query_types = {
+                    str(match.get("query", {}).get("query_type", "model_generated"))
+                    for match in fact.get("matched_queries", [])
+                }
+                source_weight = self.config.label_seed_weight if (
+                    "label_target" in query_types and "model_generated" not in query_types
+                ) else 1.0
                 subject_id, _, object_id = endpoint
                 for entity_id in (subject_id, object_id):
                     if self.graph.entity_types.get(entity_id) in SEED_TYPES:
                         degree_penalty = max(self.graph.entity_chunk_counts.get(entity_id, 1), 1)
-                        seed_scores[entity_id].append(max(fact["score"], 0.0) / degree_penalty)
+                        seed_scores[entity_id].append(
+                            max(fact["score"], 0.0) * source_weight / degree_penalty
+                        )
             for entity_id, scores in seed_scores.items():
                 reset_weights[self.graph.node_index[f"entity:{entity_id}"]] = float(np.mean(scores))
             event["details"]["seed_entities"] = len(seed_scores)
+            event["details"]["label_seed_weight"] = self.config.label_seed_weight
         seed_trace = [
             {
                 "entity_id": entity_id,

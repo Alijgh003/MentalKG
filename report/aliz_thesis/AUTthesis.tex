@@ -1,0 +1,40 @@
+
+\documentclass[oneside,msc,12pt]{AUTthesis}
+\input{commands}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{bidi} % برای راست‌به‌چپ شدن محیط‌های لیست و الگوریتم
+
+\begin{document}
+\linespread{1.75}
+
+\input{fa_title}
+
+% تاییدیه دفاع
+\input{taid}
+
+% سپاسگزاری را در فایل زیر بنویسید.
+\input{acknowledgement}
+
+% دستور زیر برای شماره گذاری صفحات قبل از فصل اول با حروف ابجد است.
+\pagenumbering{alph}
+%-----------------------------------------------------------------------
+% فایل زیر دستورات مربوط به نمایش صفحات فهرست مطالب- فهرست اشکال و جداول است.
+\input{TOC-TOF-LOT}
+
+\pagenumbering{arabic}
+\pagestyle{style1}
+%---------------------------------------------------chapters(فصل ها)
+\include{Chapters/Chapter1}
+\include{Chapters/Chapter2}
+\include{Chapters/Chapter3}
+\include{Chapters/Chapter4}
+\include{Chapters/Chapter5}
+\include{Chapters/Chapter6}
+%----------------------------------------appendix( مراجع و پیوست ها)
+\chapterfont{\vspace*{-2em}\centering\LARGE}%
+\bibliographystyle{unsrt-fa}
+\bibliography{references}
+%-------------------------------------------------------------
+\include{en-abstract}
+\input{en_title}
+\end{document}

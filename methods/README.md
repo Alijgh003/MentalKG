@@ -4,6 +4,27 @@ Every method implements the small interface in `methods/base.py` and is exposed
 through `methods/registry.py`. The common runner writes one provenance-complete
 JSONL record per sample.
 
+## ToG and ToG-2 adapters
+
+`tog` and `tog2` are registered in the same runner. Their original DSM
+traversal, pruning, and trace code is vendored unchanged under
+`methods/_tog_vendor/`; `methods/tog_adapters.py` only translates one
+`BenchmarkSample` to the original JSON trace runner and maps the trace back to
+`MethodResult`. This keeps the two implementations separate from the existing
+HippoRAG graph code and avoids duplicate retrieval logic.
+
+They use the original environment contract (`LLM_API_KEY`,
+`DSM_KG_DATABASE_URL`, `EMBEDDING_API_KEY`, `MILVUS_URI`, and related settings):
+
+```bash
+.venv/bin/python scripts/run_method.py --method tog --dataset SWMH --split test --limit 10
+.venv/bin/python scripts/run_method.py --method tog2 --dataset SWMH --split test --limit 10
+```
+
+Both methods still emit the common JSONL/events/log artifacts. Missing external
+services or credentials are recorded as a per-sample error by the common
+runner, so a failed ToG sample cannot terminate or corrupt the rest of a run.
+
 List registered methods and available frozen splits:
 
 ```bash

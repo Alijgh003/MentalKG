@@ -181,7 +181,8 @@ def event_record(event: dict, *, run_id: str, method: str, dataset: str, split: 
 
 
 def main() -> int:
-    args = parser().parse_args()
+    arg_parser = parser()
+    args = arg_parser.parse_args()
     if args.list:
         print("Methods:")
         for method in available_methods():
@@ -191,27 +192,27 @@ def main() -> int:
             print(f"  {dataset}/{split}")
         return 0
     if not args.method or not args.dataset:
-        parser().error("--method and --dataset are required unless --list is used")
+        arg_parser.error("--method and --dataset are required unless --list is used")
     if args.limit is not None and args.limit <= 0:
-        parser().error("--limit must be positive")
+        arg_parser.error("--limit must be positive")
     if args.offset < 0:
-        parser().error("--offset cannot be negative")
+        arg_parser.error("--offset cannot be negative")
 
     options = parse_options(args.method_option)
     if args.row_indices:
         try:
             row_indices = [int(value.strip()) for value in args.row_indices.split(",") if value.strip()]
         except ValueError as error:
-            parser.error(f"--row-indices must contain integers: {error}")
+            arg_parser.error(f"--row-indices must contain integers: {error}")
         if not row_indices or any(index < 0 for index in row_indices):
-            parser.error("--row-indices must contain at least one non-negative integer")
+            arg_parser.error("--row-indices must contain at least one non-negative integer")
         if len(set(row_indices)) != len(row_indices):
-            parser.error("--row-indices must not contain duplicates")
+            arg_parser.error("--row-indices must not contain duplicates")
         all_samples = load_samples(args.dataset, args.split, limit=None, offset=0)
         by_index = {sample.dataset_row_index: sample for sample in all_samples}
         missing = [index for index in row_indices if index not in by_index]
         if missing:
-            parser.error(f"Dataset rows not found: {missing}")
+            arg_parser.error(f"Dataset rows not found: {missing}")
         samples = [by_index[index] for index in row_indices]
     else:
         limit = None if args.all else (args.limit or 10)

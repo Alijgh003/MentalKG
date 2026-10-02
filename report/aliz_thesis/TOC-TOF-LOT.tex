@@ -1,0 +1,33 @@
+%{\pagestyle{style2}
+%\tableofcontents}\newpage
+%
+%\listoffigures
+\cleardoublepage
+\pagestyle{style6}
+\tableofcontents
+\pagestyle{style6}
+\cleardoublepage
+%اگر لیست تصاویر و لیست جداول ندارید ، کدهای زیر را با گذاشتن % در ابتدای آنها، غیرفعال کنید.
+\BeginNoToc
+%============
+\addtocontents{lof}{\lofheading}% add heading to the first page in LoFigures
+\pagestyle{style5}
+\listoffigures
+\thispagestyle{style5}
+\cleardoublepage
+%============
+\addtocontents{lot}{\lotheading}% add heading to the first page in LoTables
+\thispagestyle{style4}
+\listoftables
+\thispagestyle{style4}
+%============
+%\cleardoublepage
+%
+\cleardoublepage
+\setcounter{savepage}{\arabic{page}}
+\mainmatter
+\EndNoToc
+\makeatletter
+\immediate\write\@auxout{\string\@writefile{toc}{\string\setcounter{tocdepth}{\string\SavedTocDepth}}}
+\immediate\write\@auxout{\string\@writefile{toc}{\string\tocheading}}
+\makeatother
