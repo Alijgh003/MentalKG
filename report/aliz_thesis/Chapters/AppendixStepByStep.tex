@@ -1,0 +1,106 @@
+\chapter{نمونه اجرای گام‌به‌گام روش‌ها}\label{app:step-by-step}
+
+این پیوست، اجرای یک نمونه مشترک از پنج روش را ثبت می‌کند. شناسه نمونه، برچسب واقعی، متن ورودی، تصمیم‌های میانی، زمینه‌های انتخاب‌شده و پاسخ نهایی گزارش شده‌اند.
+
+\section{نمونه مشترک}
+\begin{latin}\footnotesize\begin{verbatim}
+sample_id: dr-test-029c26d1b1461025
+gold label: yes
+post excerpt: “I get more high strung, anxious and depressed every day ...
+                Living is becoming a chore.”
+\end{verbatim}
+\end{latin}
+
+\section{روش \lr{Vanilla RAG}}
+\begin{latin}\footnotesize\begin{verbatim}
+pipeline:
+passage_retrieval -> reranking -> answer_generation
+passage_retrieval: 50 candidates
+reranking: top 10 candidates
+answer input: top 5 evidence passages
+P1: “Seemed sad or depressed for several hours?”
+P2: “Feeling down, depressed, or hopeless?”
+P3/P5: clinical depression examples
+answer: yes
+cited_passage_ids: [P1, P2]
+\end{verbatim}
+\end{latin}
+توضیح روش بر اساس دو قطعه نخست است: متن نمونه به‌صراحت از افسردگی روزانه و دشوارشدن زندگی سخن می‌گوید و قطعه‌های بازیابی‌شده این توصیف را با خلق افسرده و ناامیدی مرتبط می‌کنند.
+
+\section{روش \lr{HippoRAG 2}}
+\begin{latin}\footnotesize\begin{verbatim}
+pipeline:
+fact_generation -> fact_filtering -> fact_retrieval -> seed_weighting
+-> PPR -> passage_ranking -> answer_generation
+queries:
+anxiety --can co-occur with--> depression
+feeling high strung --is associated with--> anxiety
+depressive mood --is a symptom of--> depression
+living is a chore --may indicate--> depression
+retrieved fact candidates: 20
+selected facts: 12
+initial passages: 6
+ranked passage candidates: 20
+answer: yes
+cited_passage_ids: []
+evidence_passage_ids: [P1, P2, P3, P4, P5]
+\end{verbatim}
+\end{latin}
+در این نمونه، واقعیت‌های استخراج‌شده به‌صورت سه‌تایی تولید شدند. پس از پالایش و بازیابی، قطعه‌های مرتبط با خلق افسرده و ناامیدی در رتبه‌های بالاتر قرار گرفتند و پاسخ نهایی «بله» بود.
+
+\section{روش زنجیره فکر \lr{CoT}}
+\begin{latin}\footnotesize\begin{verbatim}
+pipeline:
+question + valid_labels -> cot_generation -> answer
+retrieval: none
+graph traversal: none
+LLM calls: 1
+answer: yes
+\end{verbatim}
+\end{latin}
+مدل بر پایه مشاهده مستقیم «افسردگی هر روزه» و دشوارشدن زندگی، برچسب «بله» را انتخاب کرد؛ در این روش هیچ بازیابی متن یا پیمایش گرافی انجام نشد.
+
+\section{روش \lr{ToG-1}}
+\begin{latin}\footnotesize\begin{verbatim}
+pipeline:
+topic_entity_extraction -> graph traversal -> answer_generation
+topic entity: depressed
+retrieved triplet: (Depressed, manifests_with, negative mood)
+answer prompt: original post + triplet + allowed labels
+answer: yes
+\end{verbatim}
+\end{latin}
+موجودیت «افسرده» از متن استخراج شد و سه‌تایی مرتبط با خلق منفی از گراف بازیابی گردید. مدل با ترکیب متن اصلی و مسیر گرافی، برچسب «بله» را تولید کرد.
+
+\section{روش \lr{ToG-2}}
+\begin{latin}\footnotesize\begin{verbatim}
+pipeline:
+TopicEntityExtraction -> TopicPrune -> CombinedRelationPrune
+-> graph traversal -> context ranking -> SufficiencyAndAnswer
+entities: [high strung, anxious, depressed, depression]
+seed entities: 10
+PPR iterations: 26
+calls: 1_extract, 2_topic_prune, 3_relation_prune, 4_sufficiency
+ranked contexts:
+  chunk 6596f07f: marked depressed mood
+  chunk 3e47f1d7: hopeless daily / severe depression assessment
+answer: yes
+stopping_reason: llm_sufficient
+selected paths: none in this sample
+\end{verbatim}
+\end{latin}
+در این نمونه، پس از استخراج و هرس موجودیت‌ها، قطعه‌های مرتبط رتبه‌بندی شدند. مدل زبانی کفایت زمینه را تأیید کرد و حلقه با پاسخ «بله» پایان یافت.
+
+\section{نمونه استخراج ادعا از توضیح \lr{ToG-2}}
+\begin{latin}\scriptsize\begin{verbatim}
+case claims:
+MCASE_1: the poster -- reports -> depressed every day
+MCASE_2: the poster -- reports -> living is becoming a chore
+clinical claims:
+MCLINICAL_1: depressed every day -- aligns with -> marked depressed mood
+MCLINICAL_2: living is a chore -- aligns with -> marked depressed mood
+MCLINICAL_3: depressed every day -- aligns with -> hopeless daily
+MCLINICAL_4: living is a chore -- aligns with -> hopeless daily
+\end{verbatim}
+\end{latin}
+در ارزیابی توضیح، ادعاهای مربوط به شخص از ادعاهای بالینی جدا شدند و فقط ادعاهای بالینی با فکت‌های مجموعه دانش مقایسه شدند.

@@ -235,22 +235,35 @@ Mo, Belinda, Yu, Kyssen, Kazdan, Joshua, Cabezas, Joan, Mpala, Proud, Yu, Lisa,
 
 \begin{LTRbibitems}
 \resetlatinfont
-\bibitem{yuan2021bartscore}
-Yuan, Weizhe, Neubig, Graham, and Liu, Pengfei.
-\newblock {BARTScore}: Evaluating generated text as text generation.
-\newblock  in {\em Advances in Neural Information Processing Systems},
-  vol.~34,  pp. 27263--27277, 2021.
-
-\end{LTRbibitems}
-
-\begin{LTRbibitems}
-\resetlatinfont
 \bibitem{sansford2024grapheval}
 Sansford, Hannah, Richardson, Nicholas, Petric~Maretic, Hermina, and
   Nait~Saada, Juba.
 \newblock {GraphEval}: A knowledge-graph based {LLM} hallucination evaluation
   framework.
 \newblock arXiv preprint arXiv:2407.10793, 2024.
+
+\end{LTRbibitems}
+
+\begin{LTRbibitems}
+\resetlatinfont
+\bibitem{gemma4technicalreport}
+{Google DeepMind}.
+\newblock Gemma 4 technical report.
+\newblock {\em arXiv preprint arXiv:2607.02770}, 2026.
+
+\end{LTRbibitems}
+
+\begin{LTRbibitems}
+\resetlatinfont
+\bibitem{gunther2025jinaembeddingsv4}
+G{"u}nther, Michael, Milliken, Louis, Wang, Jonathan, Arora, Alexander,
+  F{"u}rstenau, Hagen, Sturua, Saba, Wang, Han, Xiao, Chia-Hsiang, G{"u}nther,
+  Sophie, Welbl, Johannes, Ni, Jianmo, Wiegand, Michael, Xiao, Yulong, Savkov,
+  Aleksandar, Wang, Xue, Yu, Daniel, Zhu, Chen, Ma, Zhuyun, et~al.
+\newblock Jina embeddings v4: Universal embeddings for multimodal multilingual
+  retrieval.
+\newblock  in {\em Proceedings of the First Conference on Language Modeling},
+  2025.
 
 \end{LTRbibitems}
 
@@ -271,6 +284,17 @@ Sansford, Hannah, Richardson, Nicholas, Petric~Maretic, Hermina, and
 Morrison, James.
 \newblock {\em DSM-5-TR Made Easy: The Clinician's Guide to Diagnosis}.
 \newblock The Guilford Press, 2022.
+
+\end{LTRbibitems}
+
+\begin{LTRbibitems}
+\resetlatinfont
+\bibitem{lee2025nvembed}
+Lee, Chankyu, Roy, Rajarshi, Xu, Mengyao, Raiman, Jonathan, Shoeybi, Mohammad,
+  Catanzaro, Bryan, and Ping, Wei.
+\newblock {NV-Embed}: Improved techniques for training {LLM}s as generalist
+  embedding models.
+\newblock  in {\em International Conference on Learning Representations}, 2025.
 
 \end{LTRbibitems}
 

@@ -1,8 +1,11 @@
 
 \documentclass[oneside,msc,12pt]{AUTthesis}
+\usepackage{xcolor}
+\usepackage{listings}
 \input{commands}
 \usepackage[ruled,vlined]{algorithm2e}
 \usepackage{bidi} % برای راست‌به‌چپ شدن محیط‌های لیست و الگوریتم
+\lstset{basicstyle=\ttfamily\footnotesize,breaklines=true,columns=fullflexible,frame=single,showstringspaces=false,keywordstyle=\color{blue},commentstyle=\color{gray},captionpos=b,keepspaces=true,upquote=true}
 
 \begin{document}
 \linespread{1.75}
@@ -27,9 +30,11 @@
 \include{Chapters/Chapter1}
 \include{Chapters/Chapter2}
 \include{Chapters/Chapter3}
-\include{Chapters/Chapter4}
 \include{Chapters/Chapter5}
 \include{Chapters/Chapter6}
+\appendix
+\include{Chapters/AppendixPrompts}
+\include{Chapters/AppendixStepByStep}
 %----------------------------------------appendix( مراجع و پیوست ها)
 \chapterfont{\vspace*{-2em}\centering\LARGE}%
 \bibliographystyle{unsrt-fa}

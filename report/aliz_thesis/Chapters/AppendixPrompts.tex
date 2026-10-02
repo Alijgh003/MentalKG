@@ -1,0 +1,126 @@
+\chapter{امضاهای ساختاریافته و دستورهای مدل}\label{app:prompts}
+
+این پیوست، امضاهای ساختاریافته مورد استفاده برای فراخوانی مدل زبانی را ثبت می‌کند. استفاده از \lr{DSPy} قالب ورودی و خروجی فراخوانی‌ها را ثابت و قابل بازتولید می‌کند.
+
+\section{زنجیره فکر و بازیابی متن}
+\begin{latin}\footnotesize\begin{verbatim}
+class AnswerWithCoT(dspy.Signature):
+    question: str = dspy.InputField(desc="Original post and question with labels")
+    valid_labels: list[str] = dspy.InputField(desc="Complete allowed labels")
+    answer: str = dspy.OutputField(desc="Exactly one value from valid_labels")
+
+program = dspy.ChainOfThought(AnswerWithCoT,
+    rationale_field=dspy.OutputField(desc="Brief decisive reasoning"))
+\end{verbatim}
+\end{latin}
+
+این امضا در روش‌های \lr{Vanilla RAG} و \lr{HippoRAG 2} با شواهد بازیابی‌شده تکمیل می‌شود:
+\begin{latin}\footnotesize\begin{verbatim}
+class AnswerFromPsychiatricEvidence(dspy.Signature):
+    question: str = dspy.InputField(desc="Original post and question")
+    evidence: list[dict[str, str]] = dspy.InputField(desc="Retrieved passages with IDs")
+    valid_labels: list[str] = dspy.InputField(desc="Complete allowed labels")
+    answer: str = dspy.OutputField(desc="Exactly one value from valid_labels")
+    cited_passage_ids: list[str] = dspy.OutputField(desc="Useful passage IDs")
+program = dspy.ChainOfThought(AnswerFromPsychiatricEvidence)
+\end{verbatim}
+\end{latin}
+
+\section{امضاهای روش \lr{HippoRAG 2}}
+\begin{latin}\footnotesize\begin{verbatim}
+class GeneratePsychiatricFactQueries(dspy.Signature):
+    post: str = dspy.InputField(desc="Psychiatric post or question")
+    max_triples: int = dspy.InputField(desc="Maximum triples")
+    triples: list[dict[str, str]] = dspy.OutputField(desc="Subject/predicate objects")
+
+class FilterRetrievedFacts(dspy.Signature):
+    question: str = dspy.InputField()
+    queries_json: str = dspy.InputField(desc="JSON retrieval queries")
+    candidates_json: str = dspy.InputField(desc="JSON candidates and ranks")
+    max_selected: int = dspy.InputField(desc="Maximum fact IDs")
+    selected_ids: list[str] = dspy.OutputField(desc="Selected IDs by usefulness")
+\end{verbatim}
+\end{latin}
+
+\section{امضاهای روش \lr{ToG-1}}
+در پیاده‌سازی نهایی \lr{ToG-1} کلاس امضای جداگانه‌ای در \lr{DSPy} تعریف نشد و استخراج موجودیت و تولید پاسخ با الگوهای مستقیم دستور انجام گرفت.
+
+\section{امضاهای روش \lr{ToG-2}}
+\begin{latin}\footnotesize\begin{verbatim}
+class TopicEntityExtraction(dspy.Signature):
+    post: str = dspy.InputField(desc="Complete post and classification question")
+    allowed_labels: list[str] = dspy.InputField(desc="All possible classes")
+    k: int = dspy.InputField(desc="Maximum entity names")
+    entities: list[str] = dspy.OutputField(desc="Up to k distinct surface forms")
+
+class TopicPrune(dspy.Signature):
+    question: str = dspy.InputField()
+    allowed_labels: list[str] = dspy.InputField()
+    seed_nodes: str = dspy.InputField(desc="UUID to canonical-name mapping")
+    width: int = dspy.InputField()
+    selected_ids: list[str] = dspy.OutputField(desc="Subset of supplied UUIDs")
+
+class CombinedRelationPrune(dspy.Signature):
+    question: str = dspy.InputField()
+    allowed_labels: list[str] = dspy.InputField()
+    relation_options: str = dspy.InputField(desc="JSON relation options")
+    width: int = dspy.InputField(desc="Maximum relations per topic")
+    selected_option_ids: list[str] = dspy.OutputField(desc="Copied option IDs")
+    scores: list[float] = dspy.OutputField(desc="Relevance scores from 0 to 1")
+    explanation: str = dspy.OutputField(desc="Why selected relations help")
+\end{verbatim}
+\end{latin}
+
+\begin{latin}\footnotesize\begin{verbatim}
+class SufficiencyAndAnswer(dspy.Signature):
+    question: str = dspy.InputField(desc="Question and all classes")
+    allowed_labels: list[str] = dspy.InputField()
+    previous_clue: str = dspy.InputField()
+    selected_triple_paths: str = dspy.InputField(desc="Directed paths")
+    ranked_contexts: str = dspy.InputField(desc="Top-K chunks")
+    sufficiency_explanation: str = dspy.OutputField()
+    sufficient: bool = dspy.OutputField(desc="Whether evidence supports a class")
+    answer_explanation: str = dspy.OutputField(desc="Explanation or empty")
+    label: str = dspy.OutputField(desc="Exact class or empty")
+    clue: str = dspy.OutputField(desc="Missing evidence or empty")
+
+class QueryReformulation(dspy.Signature):
+    question: str = dspy.InputField()
+    allowed_labels: list[str] = dspy.InputField()
+    clue: str = dspy.InputField()
+    selected_triple_paths: str = dspy.InputField()
+    ranked_contexts: str = dspy.InputField()
+    needed_evidence: str = dspy.OutputField()
+    query: str = dspy.OutputField(desc="Reformulated retrieval query")
+
+class BestEffortAnswer(dspy.Signature):
+    question: str = dspy.InputField()
+    allowed_labels: list[str] = dspy.InputField()
+    previous_clue: str = dspy.InputField()
+    selected_triple_paths: str = dspy.InputField()
+    ranked_contexts: str = dspy.InputField()
+    label: str = dspy.OutputField(desc="Exact class or empty")
+    explanation: str = dspy.OutputField()
+\end{verbatim}
+\end{latin}
+
+\section{ارزیابی ادعاهای بالینی}
+\begin{latin}\footnotesize\begin{verbatim}
+class ExtractClaims(dspy.Signature):
+    explanation: str = dspy.InputField()
+    case_entities: list[dict[str, str]] = dspy.OutputField()
+    clinical_entities: list[dict[str, str]] = dspy.OutputField()
+    case_relations: list[dict[str, str]] = dspy.OutputField()
+    clinical_relations: list[dict[str, str]] = dspy.OutputField()
+
+class Judge(dspy.Signature):
+    generated_clinical_triple: str = dspy.InputField()
+    retrieved_knowledge_graph_facts: str = dspy.InputField()
+    support_score: str = dspy.OutputField(desc="Integer from 0 to 10")
+    reasoning: str = dspy.OutputField(desc="Brief support reasoning")
+extractor = dspy.Predict(ExtractClaims)
+judge = dspy.Predict(Judge)
+\end{verbatim}
+\end{latin}
+
+تمام امضاهای \lr{DSPy} مورد استفاده در این پژوهش در این پیوست ثبت شده‌اند. جزئیات اجرای نمونه‌ها در پیوست \hyperref[app:step-by-step]{«نمونه اجرای گام‌به‌گام روش‌ها»} آمده است.

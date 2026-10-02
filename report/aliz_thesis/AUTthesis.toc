@@ -25,38 +25,53 @@
 \contentsline {section}{\numberline {2-7}مقایسه روش‌های بازیابی‌محور و عامل‌محور}{20}{section.2.7}%
 \contentsline {section}{\numberline {2-8}استدلال مقید به گراف: روش \lr {GCR}}{21}{section.2.8}%
 \contentsline {section}{\numberline {2-9}کاربرد در سلامت روان و مبنای ارزیابی}{22}{section.2.9}%
-\contentsline {chapter}{\numberline {3}روش تحقیق و طراحی چارچوب آزمایش}{24}{chapter.3}%
-\contentsline {section}{\numberline {3-1}طرح کلی پژوهش}{25}{section.3.1}%
-\contentsline {section}{\numberline {3-2}تعریف وظیفه و خروجی‌های مورد انتظار}{26}{section.3.2}%
-\contentsline {section}{\numberline {3-3}منابع داده و گراف دانش دامنه‌ای}{27}{section.3.3}%
-\contentsline {section}{\numberline {3-4}روش‌های مورد مقایسه}{28}{section.3.4}%
-\contentsline {subsection}{\numberline {3-4-1}استدلال زنجیره‌ای و بازیابی افزوده متعارف}{28}{subsection.3.4.1}%
-\contentsline {subsection}{\numberline {3-4-2}روش‌های گراف‌محور}{29}{subsection.3.4.2}%
-\contentsline {section}{\numberline {3-5}پروتکل اجرای آزمایش‌ها}{29}{section.3.5}%
-\contentsline {section}{\numberline {3-6}معیارهای ارزیابی}{30}{section.3.6}%
-\contentsline {section}{\numberline {3-7}مقایسه منصفانه، بازتولیدپذیری و جمع‌بندی}{30}{section.3.7}%
-\contentsline {chapter}{\numberline {4}بازپیاده‌سازی و انطباق روش‌های منتخب}{31}{chapter.4}%
-\contentsline {section}{\numberline {4-1}معماری چارچوب اجرایی و آماده‌سازی داده‌ها}{32}{section.4.1}%
-\contentsline {section}{\numberline {4-2}آماده‌سازی گراف دانش دامنه‌ای}{32}{section.4.2}%
-\contentsline {section}{\numberline {4-3}بازپیاده‌سازی خطوط پایه و روش بازیابی‌محور}{32}{section.4.3}%
-\contentsline {section}{\numberline {4-4}بازپیاده‌سازی روش‌های عامل‌محور و قیدگذارانه}{32}{section.4.4}%
-\contentsline {section}{\numberline {4-5}پیاده‌سازی ارزیابی \lr {GraphEval}}{32}{section.4.5}%
-\contentsline {section}{\numberline {4-6}انطباق روش‌ها با وظیفه سلامت روان}{32}{section.4.6}%
-\contentsline {section}{\numberline {4-7}تنظیمات فنی، چالش‌ها و جمع‌بندی}{32}{section.4.7}%
-\contentsline {chapter}{\numberline {5}نتایج و تحلیل مقایسه‌ای}{33}{chapter.5}%
-\contentsline {section}{\numberline {5-1}تنظیمات نهایی آزمایش‌ها}{34}{section.5.1}%
-\contentsline {section}{\numberline {5-2}نتایج پیش‌بینی‌های تشخیصی}{34}{section.5.2}%
-\contentsline {section}{\numberline {5-3}کیفیت توضیحات و تحلیل توهم}{34}{section.5.3}%
-\contentsline {section}{\numberline {5-4}کارایی محاسباتی و هزینه متنی}{34}{section.5.4}%
-\contentsline {section}{\numberline {5-5}مطالعات حذف مؤلفه و تحلیل حساسیت}{34}{section.5.5}%
-\contentsline {section}{\numberline {5-6}تحلیل خطا و بحث نهایی}{34}{section.5.6}%
-\contentsline {section}{\numberline {5-7}تهدیدهای اعتبار و جمع‌بندی}{34}{section.5.7}%
-\contentsline {chapter}{\numberline {6}جمع‌بندی، محدودیت‌ها و مسیرهای آینده}{35}{chapter.6}%
-\contentsline {section}{\numberline {6-1}مرور پژوهش انجام‌شده}{36}{section.6.1}%
-\contentsline {section}{\numberline {6-2}پاسخ به پرسش‌های پژوهش}{36}{section.6.2}%
-\contentsline {section}{\numberline {6-3}جمع‌بندی یافته‌های اصلی}{36}{section.6.3}%
-\contentsline {section}{\numberline {6-4}محدودیت‌های پژوهش}{36}{section.6.4}%
-\contentsline {section}{\numberline {6-5}پیشنهادهایی برای پژوهش‌های آینده}{36}{section.6.5}%
-\contentsline {section}{\numberline {6-6}سخن پایانی}{36}{section.6.6}%
-\contentsline {chapter}{منابع و مراجع}{37}{chapter*.4}%
+\contentsline {chapter}{\numberline {3}چارچوب و پیاده‌سازی روش‌ها}{25}{chapter.3}%
+\contentsline {section}{\numberline {3-1}چارچوب مشترک آزمایش‌ها}{26}{section.3.1}%
+\contentsline {section}{\numberline {3-2}ساخت گراف دانش و نمایه‌سازی برداری}{27}{section.3.2}%
+\contentsline {section}{\numberline {3-3}پیاده‌سازی روش‌های مورد مقایسه}{28}{section.3.3}%
+\contentsline {subsection}{\numberline {3-3-1}زنجیره فکر \lr {(CoT)}}{29}{subsection.3.3.1}%
+\contentsline {subsection}{\numberline {3-3-2}\lr {Vanilla RAG}}{29}{subsection.3.3.2}%
+\contentsline {subsection}{\numberline {3-3-3}\lr {HippoRAG 2}}{29}{subsection.3.3.3}%
+\contentsline {subsection}{\numberline {3-3-4}\lr {ToG-1}}{30}{subsection.3.3.4}%
+\contentsline {subsection}{\numberline {3-3-5}\lr {ToG-2}}{31}{subsection.3.3.5}%
+\contentsline {chapter}{\numberline {4}نتایج و تحلیل مقایسه‌ای}{32}{chapter.4}%
+\contentsline {section}{\numberline {4-1}آمار گراف دانش و نمایه‌سازی برداری}{33}{section.4.1}%
+\contentsline {section}{\numberline {4-2}مقایسه نتایج پیش‌بینی در مجموعه‌داده‌ها}{34}{section.4.2}%
+\contentsline {section}{\numberline {4-3}مقایسه توضیح‌پذیری روش‌ها}{36}{section.4.3}%
+\contentsline {subsection}{\numberline {4-3-1}شباهت معنایی توضیح‌ها}{36}{subsection.4.3.1}%
+\contentsline {subsection}{\numberline {4-3-2}ارزیابی سازگاری ادعاهای بالینی مبتنی بر گراف دانش}{37}{subsection.4.3.2}%
+\contentsline {section}{\numberline {4-4}مقایسه هزینه محاسباتی و زمان اجرا}{38}{section.4.4}%
+\contentsline {section}{\numberline {4-5}جمع‌بندی}{39}{section.4.5}%
+\contentsline {chapter}{\numberline {5}جمع‌بندی، محدودیت‌ها و مسیرهای آینده}{40}{chapter.5}%
+\contentsline {section}{\numberline {5-1}مرور پژوهش انجام‌شده}{41}{section.5.1}%
+\contentsline {section}{\numberline {5-2}محدودیت‌ها و ضعف‌های پژوهش}{41}{section.5.2}%
+\contentsline {paragraph}{تناسب روش‌ها با ساختار مجموعه‌داده.}{41}{section*.13}%
+\contentsline {paragraph}{کفایت زمینه و کیفیت برچسب‌گذاری.}{42}{section*.14}%
+\contentsline {paragraph}{دانش قبلی نامشخص مدل زبانی.}{42}{section*.15}%
+\contentsline {paragraph}{هزینه بالای مصرف توکن.}{42}{section*.16}%
+\contentsline {paragraph}{محدودبودن ارزیابی به وظیفه پایین‌دستی.}{42}{section*.17}%
+\contentsline {paragraph}{تجمع خطا در ارزیابی ادعاهای بالینی.}{43}{section*.18}%
+\contentsline {section}{\numberline {5-3}پیشنهادهایی برای پژوهش‌های آینده}{43}{section.5.3}%
+\contentsline {subsection}{\numberline {5-3-1}گسترش و بهبود مجموعه‌داده‌های تشخیص اختلالات روانی}{43}{subsection.5.3.1}%
+\contentsline {subsection}{\numberline {5-3-2}تولید توضیح‌های بالینی با پشتیبانی علمی}{43}{subsection.5.3.2}%
+\contentsline {subsection}{\numberline {5-3-3}گسترش دامنه برچسب‌ها و تشخیص باز}{44}{subsection.5.3.3}%
+\contentsline {subsection}{\numberline {5-3-4}کاهش نویز در بازیابی و بهبود \lr {HippoRAG 2}}{44}{subsection.5.3.4}%
+\contentsline {subsection}{\numberline {5-3-5}کاهش هزینه و تعداد فراخوانی‌های \lr {ToG}}{44}{subsection.5.3.5}%
+\contentsline {subsection}{\numberline {5-3-6}ارزیابی عمومی ادعا و ارتباط شواهد}{45}{subsection.5.3.6}%
+\contentsline {section}{\numberline {5-4}سخن پایانی}{45}{section.5.4}%
+\contentsline {chapter}{\numberline {آ}امضاهای ساختاریافته و دستورهای مدل}{46}{appendix.Alph1}%
+\contentsline {section}{\numberline {آ-1}زنجیره فکر و بازیابی متن}{47}{section.Alph1.1}%
+\contentsline {section}{\numberline {آ-2}امضاهای روش \lr {HippoRAG 2}}{47}{section.Alph1.2}%
+\contentsline {section}{\numberline {آ-3}امضاهای روش \lr {ToG-1}}{48}{section.Alph1.3}%
+\contentsline {section}{\numberline {آ-4}امضاهای روش \lr {ToG-2}}{48}{section.Alph1.4}%
+\contentsline {section}{\numberline {آ-5}ارزیابی ادعاهای بالینی}{50}{section.Alph1.5}%
+\contentsline {chapter}{\numberline {ب}نمونه اجرای گام‌به‌گام روش‌ها}{51}{appendix.Alph2}%
+\contentsline {section}{\numberline {ب-1}نمونه مشترک}{52}{section.Alph2.1}%
+\contentsline {section}{\numberline {ب-2}روش \lr {Vanilla RAG}}{52}{section.Alph2.2}%
+\contentsline {section}{\numberline {ب-3}روش \lr {HippoRAG 2}}{52}{section.Alph2.3}%
+\contentsline {section}{\numberline {ب-4}روش زنجیره فکر \lr {CoT}}{53}{section.Alph2.4}%
+\contentsline {section}{\numberline {ب-5}روش \lr {ToG-1}}{53}{section.Alph2.5}%
+\contentsline {section}{\numberline {ب-6}روش \lr {ToG-2}}{54}{section.Alph2.6}%
+\contentsline {section}{\numberline {ب-7}نمونه استخراج ادعا از توضیح \lr {ToG-2}}{54}{section.Alph2.7}%
+\contentsline {chapter}{منابع و مراجع}{56}{appendix*.19}%
 \contentsfinish 
